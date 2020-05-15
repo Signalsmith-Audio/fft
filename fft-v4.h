@@ -34,23 +34,26 @@ namespace signalsmith {
 			size_t size = _size;
 			while (size > 1) {
 				size_t stepSize = size;
-				for (size_t divisor = 2; divisor < sqrt(size); ++divisor) {
+				for (size_t divisor = 2; divisor <= sqrt(size); ++divisor) {
 					if (size%divisor == 0) {
 						stepSize = divisor;
 						break;
 					}
 				}
+				size_t twiddleRepeats = _size/size;
+				// Calculate twiddles
 				size_t twiddleOffset = twiddles.size();
-				plan.push_back({stepSize, twiddleOffset});
 				double phaseStep = 2*M_PI/size;
 				for (size_t i = 0; i < size/stepSize; i++) {
-					for (size_t r = 0; r < _size/size; r++) {
+					for (size_t r = 0; r < twiddleRepeats; r++) {
 						for (size_t bin = 0; bin < stepSize; bin++) {
 							double twiddlePhase = phaseStep*bin*i;
 							twiddles.push_back({cos(twiddlePhase), -sin(twiddlePhase)});
 						}
 					}
 				}	
+
+				plan.push_back({stepSize, twiddleOffset});
 				size /= stepSize;
 			}
 
@@ -70,25 +73,33 @@ namespace signalsmith {
 		}
 
 		template<bool inverse>
-		void fftStepGeneric(complex const *input, complex *output, size_t size) {
-			size_t stride = _size/size;
+		void fftStepGeneric(complex const *input, complex *output, const Step &step) {
+			size_t stepSize = step.N;
+			const complex *twiddles = &this->twiddles[step.twiddleOffset];
+
+			size_t stride = _size/stepSize;
 			for (size_t offset = 0; offset < stride; offset++) {
-				for (size_t bin = 0; bin < size; ++bin) {
+				for (size_t bin = 0; bin < stepSize; ++bin) {
 					complex sum = input[0];
-					for (size_t i = 1; i < size; ++i) {
-						V phase = 2*M_PI*bin*i/size;
+					for (size_t i = 1; i < stepSize; ++i) {
+						V phase = 2*M_PI*bin*i/stepSize;
 						complex factor = {cos(phase), -sin(phase)};
 						sum += (inverse ? conj(factor) : factor)*input[i*stride];
 					}
-					output[bin] = sum;
+
+					const complex &twiddle = *twiddles;
+					output[bin] = sum*(inverse ? conj(twiddle) : twiddle);
+					twiddles++;
 				}
+
 				input += 1;
-				output += size;
+				output += stepSize;
 			}
 		}
 
 		template<bool inverse>
-		void fftStep2(complex const *input0, complex *output) {
+		void fftStep2(complex const *input0, complex *output, const Step &step) {
+			const complex *twiddles = &this->twiddles[step.twiddleOffset];
 			size_t stride = _size/2;
 
 			complex const *input1 = input0 + stride;
@@ -96,8 +107,12 @@ namespace signalsmith {
 			while (input0 != end) {
 				complex sum = *input0 + *input1;
 				complex diff = *input0 - *input1;
+
+				const complex &twiddle = twiddles[1];
+				twiddles += 2;
+
 				output[0] = sum;
-				output[1] = diff;
+				output[1] = diff*(inverse ? conj(twiddle) : twiddle);
 				++input0;
 				++input1;
 				output += 2;
@@ -117,13 +132,9 @@ namespace signalsmith {
 			// Go through the steps
 			for (const Step& step : plan) {
 				if (step.N == 2) {
-					fftStep2<inverse>(A, B);
+					fftStep2<inverse>(A, B, step);
 				} else {
-					fftStepGeneric<inverse>(A, B, step.N);
-				}
-				for (size_t i = 0; i < _size; i++) {
-					complex &twiddle = twiddles[step.twiddleOffset + i];
-					B[i] *= (inverse ? conj(twiddle) : twiddle);
+					fftStepGeneric<inverse>(A, B, step);
 				}
 				swap(A, B);
 			}

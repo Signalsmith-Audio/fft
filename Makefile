@@ -23,7 +23,7 @@ out/test: *.h $(shell find tests -iname "*.h") $(shell find tests -iname "*.cpp"
 
 ############## Benchmark ##############
 
-BENCHMARK_CPP_FILES := benchmark/*.cpp
+BENCHMARK_CPP_FILES := benchmark/benchmark.cpp
 
 benchmark: out/benchmark
 	mkdir -p out/results
@@ -32,11 +32,26 @@ benchmark: out/benchmark
 out/benchmark: *.h $(shell find benchmark -iname "*.h") $(shell find benchmark -iname "*.cpp")
 	echo "building benchmark: ${BENCHMARK_CPP_FILES}"
 	mkdir -p out
-	g++ -std=c++11 -Wall -Wextra -Wfatal-errors -g -O3 \
- 		-Wpedantic -pedantic-errors \
+	g++ -std=c++11 -msse2 -mavx -g -O3 \
 		"${SHARED_PATH}/test/main.cpp" -I "${SHARED_PATH}" \
 		-I benchmark/ ${BENCHMARK_CPP_FILES} \
 		-o out/benchmark
+
+############## Benchmark against others ##############
+
+BENCHMARK_ALL_CPP_FILES := benchmark/*.cpp
+
+benchmark-all: out/benchmark-all
+	mkdir -p out/results
+	cd out && ./benchmark-all --test-time=0.02
+
+out/benchmark-all: *.h $(shell find benchmark -iname "*.h") $(shell find benchmark -iname "*.cpp")
+	echo "building benchmark: ${BENCHMARK_ALL_CPP_FILES}"
+	mkdir -p out
+	g++ -std=c++11 -msse2 -mavx -Wfatal-errors -g -O3 \
+		"${SHARED_PATH}/test/main.cpp" -I "${SHARED_PATH}" \
+		-I benchmark/ ${BENCHMARK_ALL_CPP_FILES} \
+		-o out/benchmark-all
 
 ############## Clean ##############
 

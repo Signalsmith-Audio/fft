@@ -42,7 +42,7 @@ namespace dev_unspecialised_factors {
 			while (size > 1) {
 				size_t stepSize = size;
 				// Find the lowest prime factor
-				for (size_t divisor = 2; divisor < sqrt(size); ++divisor) {
+				for (size_t divisor = 2; divisor <= sqrt(size); ++divisor) {
 					if (size%divisor == 0) {
 						stepSize = divisor;
 						break;

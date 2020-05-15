@@ -284,7 +284,7 @@
 					<equation>\sum w_N^{2kn} x_{2n} + w_N^1 (\sum w_N^{4kn} x_{4n + 1}) + w_N^{-1} (\sum w_N^{4kn} x_{4n - 1})</equation>
 				</figure>
 
-				<p>With this, the twiddle-factors at certain points end up in conjugate pairs, which opens up another optimisation (scaling up so that either the real or imaginary part of the twiddles are 1).</p>
+				<p>With this, the twiddle-factors at certain points end up in conjugate pairs, which opens up another optimisation (pre-scaling inputs so that either the real or imaginary part of the twiddles are 1).</p>
 				<p>This uses about 5% fewer operations than ordinary split-radix (<equation>\frac{34}{9} N log_2(N)</equation> instead of <equation>4 N log_2(N)</equation>), however it makes the permutation of the results slightly more complicated, in a way which isn't helpful for us.</p>
 				<p>We're going to stick to ordinary split-radix.</p>
 			</details></aside>
@@ -352,8 +352,10 @@
 						if (benchmarks[key]) addLine(key, benchmarks[key]);
 					});
 					plot.insert({
-						x: {scale: 'log', min: 1, major: 1, label: 'size', tick: [1, 4, 16, 64, 256, 1024, 4096, 16384, 65536]},
-						y: {major: 0, min: 0, tick: [0], label: 'normalised rate'}
+						width: 600,
+						paddingX: 80,
+						x: {scale: 'log', min: 1, major: 1, label: 'size', tick: [1, 4, 16, 64, 256, 1024, 4096, 16384, 65536], pad: true},
+						y: {major: 0, min: 0, pad: true, tick: [0], label: 'normalised rate'}
 					});
 				</script>
 			</figure>
