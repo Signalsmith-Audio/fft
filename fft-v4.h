@@ -21,24 +21,6 @@ namespace signalsmith {
 		size_t _size;
 		std::vector<complex> working;
 
-		template<bool inverse>
-		void fftStepGeneric(complex const *input, complex *output, size_t size) {
-			size_t stride = _size/size;
-			for (size_t offset = 0; offset < stride; offset++) {
-				for (size_t bin = 0; bin < size; ++bin) {
-					complex sum = 0;
-					for (size_t i = 0; i < size; ++i) {
-						V phase = 2*M_PI*bin*i/size;
-						complex factor = {cos(phase), inverse ? sin(phase) : -sin(phase)};
-						sum += factor*input[i*stride];
-					}
-					output[bin] = sum;
-				}
-				input += 1;
-				output += size;
-			}
-		}
-
 		struct Step {
 			size_t N;
 			size_t twiddleOffset;
@@ -52,10 +34,17 @@ namespace signalsmith {
 			size_t size = _size;
 			while (size > 1) {
 				size_t stepSize = size;
-				if (size%2 == 0) {
-					stepSize = 2;
+				for (size_t divisor = 2; divisor < sqrt(size); ++divisor) {
+					if (size%divisor == 0) {
+						stepSize = divisor;
+						break;
+					}
 				}
-				plan.push_back({stepSize, twiddles.size()});
+				// if (size%2 == 0) {
+				// 	stepSize = 2;
+				// }
+				size_t twiddleOffset = twiddles.size();
+				plan.push_back({stepSize, twiddleOffset});
 				double phaseStep = 2*M_PI/size;
 				for (size_t i = 0; i < size/stepSize; i++) {
 					for (size_t r = 0; r < _size/size; r++) {
@@ -68,6 +57,7 @@ namespace signalsmith {
 				size /= stepSize;
 			}
 
+			// Construct permutation from factorised sizes
 			permutation.resize(1);
 			permutation[0] = 0;
 			for (int i = plan.size() - 1; i >= 0; --i) {
@@ -83,6 +73,41 @@ namespace signalsmith {
 		}
 
 		template<bool inverse>
+		void fftStepGeneric(complex const *input, complex *output, size_t size) {
+			size_t stride = _size/size;
+			for (size_t offset = 0; offset < stride; offset++) {
+				for (size_t bin = 0; bin < size; ++bin) {
+					complex sum = input[0];
+					for (size_t i = 1; i < size; ++i) {
+						V phase = 2*M_PI*bin*i/size;
+						complex factor = {cos(phase), -sin(phase)};
+						sum += (inverse ? conj(factor) : factor)*input[i*stride];
+					}
+					output[bin] = sum;
+				}
+				input += 1;
+				output += size;
+			}
+		}
+
+		template<bool inverse>
+		void fftStep2(complex const *input0, complex *output) {
+			size_t stride = _size/2;
+
+			complex const *input1 = input0 + stride;
+			complex const *end = input1;
+			while (input0 != end) {
+				complex sum = *input0 + *input1;
+				complex diff = *input0 - *input1;
+				output[0] = sum;
+				output[1] = diff;
+				++input0;
+				++input1;
+				output += 2;
+			}
+		}
+
+		template<bool inverse>
 		void run(complex const *input, complex *output) {
 			using std::swap;
 
@@ -94,7 +119,11 @@ namespace signalsmith {
 	
 			// Go through the steps
 			for (const Step& step : plan) {
-				fftStepGeneric<inverse>(A, B, step.N);
+				if (false && step.N == 2) {
+					fftStep2<inverse>(A, B);
+				} else {
+					fftStepGeneric<inverse>(A, B, step.N);
+				}
 				for (size_t i = 0; i < _size; i++) {
 					complex &twiddle = twiddles[step.twiddleOffset + i];
 					B[i] *= (inverse ? conj(twiddle) : twiddle);

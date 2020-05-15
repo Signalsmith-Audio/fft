@@ -15,8 +15,8 @@ namespace dev_unspecialised_factors {
 			size_t stride = _size/size;
 			for (size_t offset = 0; offset < stride; offset++) {
 				for (size_t bin = 0; bin < size; ++bin) {
-					complex sum = 0;
-					for (size_t i = 0; i < size; ++i) {
+					complex sum = input[0];
+					for (size_t i = 1; i < size; ++i) {
 						V phase = 2*M_PI*bin*i/size;
 						complex factor = {cos(phase), inverse ? sin(phase) : -sin(phase)};
 						sum += factor*input[i*stride];
@@ -41,8 +41,12 @@ namespace dev_unspecialised_factors {
 			size_t size = _size;
 			while (size > 1) {
 				size_t stepSize = size;
-				if (size%2 == 0) {
-					stepSize = 2;
+				// Find the lowest prime factor
+				for (size_t divisor = 2; divisor < sqrt(size); ++divisor) {
+					if (size%divisor == 0) {
+						stepSize = divisor;
+						break;
+					}
 				}
 				plan.push_back({stepSize, twiddles.size()});
 				double phaseStep = 2*M_PI/size;

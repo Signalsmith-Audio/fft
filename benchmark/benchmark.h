@@ -4,14 +4,28 @@
 
 #include "../tests/tests-common.h"
 
-template<typename Implementation, int maxSize=INT_MAX>
+template<typename Implementation, int constMaxSize=INT_MAX>
 struct Benchmark {
 	static std::vector<int> getSizes() {
-		std::vector<int> possibleSizes = {1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024};
+		std::vector<int> possibleSizes(0);
+		int size = 1;
+		int maxSize = std::min(constMaxSize, (1<<16));
+		while (size <= maxSize) {
+			possibleSizes.push_back(size);
+			size *= 2;
+		}
+
 		std::vector<int> result;
 		for (int size : possibleSizes) {
 			if (size <= maxSize) {
 				result.push_back(size);
+			}
+
+			std::vector<int> mults = {3, 5, 7, 11, 15, 23};
+			for (int mult : mults) {
+				if (size*mult < maxSize) {
+					result.push_back(size*mult);
+				}
 			}
 		}
 		return result;

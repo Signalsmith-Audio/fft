@@ -351,7 +351,7 @@
 						if (benchmarks[key]) addLine(key, benchmarks[key]);
 					});
 					plot.insert({
-						x: {scale: 'log', min: 1, major: 1, label: 'size', tick: [1, 4, 16, 64]},
+						x: {scale: 'log', min: 1, major: 1, label: 'size', tick: [1, 4, 16, 64, 256, 1024, 4096, 16384, 65536]},
 						y: {major: 0, min: 0, tick: [0], label: 'normalised rate'}
 					});
 				</script>
