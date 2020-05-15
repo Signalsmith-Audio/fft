@@ -22,6 +22,7 @@ struct Benchmark {
 			}
 
 			std::vector<int> mults = {3, 5, 7, 11, 15, 23};
+			mults = {3, 9};
 			for (int mult : mults) {
 				if (size*mult < maxSize) {
 					result.push_back(size*mult);

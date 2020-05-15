@@ -1,33 +1,8 @@
 #include <vector>
 #include <complex>
 #include <cmath>
-#include <array>
 
-#ifndef SIGNALSMITH_INLINE
-#define SIGNALSMITH_INLINE __attribute__((always_inline)) inline
-#endif
-
-namespace signalsmith {
-
-	namespace perf {
-		// Complex multiplication has edge-cases around Inf/NaN - handling those properly makes std::complex non-inlineable, so we use our own
-		template <bool conjugateSecond, typename sampleType>
-		SIGNALSMITH_INLINE std::complex<sampleType> complexMul(const std::complex<sampleType> &A, const std::complex<sampleType> &B) {
-			if (conjugateSecond) {
-				return std::complex<sampleType>{
-					B.real()*A.real() + B.imag()*A.imag(),
-					B.real()*A.imag() - B.imag()*A.real()
-				};
-			} else {
-				return std::complex<sampleType>{
-					A.real()*B.real() - A.imag()*B.imag(),
-					A.real()*B.imag() + A.imag()*B.real()
-				};
-			}
-		}
-
-	}
-
+namespace dev_specialised23 {
 	// template<typename T>
 	// static void printArray(std::complex<T>* array, size_t size, bool newline=true) {
 	// 	for (unsigned int i = 0; i < size; ++i) {
@@ -109,55 +84,16 @@ namespace signalsmith {
 					for (size_t i = 1; i < stepSize; ++i) {
 						V phase = 2*M_PI*bin*i/stepSize;
 						complex factor = {cos(phase), -sin(phase)};
-						sum += perf::complexMul<inverse>(input[i*stride], factor);
+						sum += (inverse ? conj(factor) : factor)*input[i*stride];
 					}
 
-					output[bin] = perf::complexMul<inverse>(sum, twiddles[bin]);
-				}
-				twiddles += stepSize;
-
-				input += 1;
-				output += stepSize;
-			}
-		}
-
-		template<bool inverse, size_t stepSize>
-		static std::array<complex, stepSize*stepSize> factorsFixed() {
-			std::array<complex, stepSize*stepSize> result;
-			for (size_t i = 0; i < stepSize; i++) {
-				for (size_t j = 0; j < stepSize; j++) {
-					double phase = 2*M_PI*i*j/stepSize;
-					result[i*stepSize + j] = {cos(phase), inverse ? sin(phase) : -sin(phase)};
-				}
-			}
-			return result;
-		}
-
-		template<bool inverse, int stepSize>
-		void fftStepFixed(complex const *input, complex *output, const Step &step) {
-			static const std::array<complex, stepSize*stepSize> factors = factorsFixed<inverse, stepSize>();
-
-			const complex *twiddles = &this->twiddles[step.twiddleOffset];
-
-			size_t stride = _size/stepSize;
-			for (size_t offset = 0; offset < stride; offset++) {
-				complex sum = input[0];
-				for (size_t i = 1; i < stepSize; ++i) {
-					sum += input[i*stride];
-				}
-				output[0] = sum;
-
-				for (size_t bin = 1; bin < stepSize; ++bin) {
-					complex sum = input[0];
-					for (size_t i = 1; i < stepSize; ++i) {
-						sum += perf::complexMul<false>(input[i*stride], factors[bin*stepSize + i]);
-					}
-					output[bin] = perf::complexMul<inverse>(sum, twiddles[bin]);
+					const complex &twiddle = *twiddles;
+					output[bin] = sum*(inverse ? conj(twiddle) : twiddle);
+					twiddles++;
 				}
 
 				input += 1;
 				output += stepSize;
-				twiddles += stepSize;
 			}
 		}
 
@@ -176,41 +112,13 @@ namespace signalsmith {
 				twiddles += 2;
 
 				output[0] = sum;
-				output[1] = perf::complexMul<inverse>(diff, twiddle);
+				output[1] = diff*(inverse ? conj(twiddle) : twiddle);
 				++input0;
 				++input1;
 				output += 2;
 			}
 		}
 
-		template<bool inverse>
-		void fftStep3(complex const *input0, complex *output, const Step &step) {
-			const complex factor3 = {-0.5, inverse ? 0.8660254037844386 : -0.8660254037844386};
-
-			const complex *twiddles = &this->twiddles[step.twiddleOffset];
-			size_t stride = _size/3;
-
-			complex const *input1 = input0 + stride;
-			complex const *input2 = input0 + stride*2;
-			complex const *end = input1;
-			while (input0 != end) {
-				complex A = *input0, B = *input1, C = *input2;
-				complex realSum = A + (B + C)*factor3.real();
-				complex imagSum = (B - C)*factor3.imag();
-
-				const complex &twiddle1 = twiddles[1];
-				const complex &twiddle2 = twiddles[2];
-				twiddles += 3;
-
-				output[0] = A + B + C;
-				output[1] = perf::complexMul<inverse>(complex{realSum.real() - imagSum.imag(), realSum.imag() + imagSum.real()}, twiddle1);
-				output[2] = perf::complexMul<inverse>(complex{realSum.real() + imagSum.imag(), realSum.imag() - imagSum.real()}, twiddle2);
-				++input0;
-				++input1;
-				++input2;
-				output += 3;
-			}
-		}
 		template<bool inverse>
 		void run(complex const *input, complex *output) {
 			using std::swap;
@@ -224,11 +132,7 @@ namespace signalsmith {
 			// Go through the steps
 			for (const Step& step : plan) {
 				if (step.N == 2) {
-					fftStepFixed<inverse, 2>(A, B, step);
-					// fftStep2<inverse>(A, B, step);
-				} else if (step.N == 3) {
-					// fftStepFixed<inverse, 3>(A, B, step);
-					fftStep3<inverse>(A, B, step);
+					fftStep2<inverse>(A, B, step);
 				} else {
 					fftStepGeneric<inverse>(A, B, step);
 				}
