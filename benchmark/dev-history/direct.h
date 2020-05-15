@@ -2,7 +2,7 @@
 #include <complex>
 #include <cmath>
 
-namespace signalsmith {
+namespace dev_direct {
 	template<typename V>
 	class FFT {
 		using complex = std::complex<V>;

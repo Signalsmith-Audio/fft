@@ -7,6 +7,14 @@
 #include "../fft-v4.h"
 
 template<typename T>
+std::complex<T> randomComplex() {
+	std::complex<T> r;
+	r.real(rand()/(double)RAND_MAX - 0.5);
+	r.imag(rand()/(double)RAND_MAX - 0.5);
+	return r;
+}
+
+template<typename T>
 bool closeEnough(std::vector<std::complex<T>> vectorA, std::vector<std::complex<T>> vectorB) {
 	double totalEnergy = 0;
 	double totalError = 0;

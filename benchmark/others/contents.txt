@@ -1,0 +1,19 @@
+kissfft/
+	cloned from https://github.com/mborgerding/kissfft.git
+pffft/
+	cloned from https://bitbucket.org/jpommier/pffft/src/default/ (Mercurial)
+kfr/
+	cloned from https://github.com/kfrlib/kfr.git
+
+	mkdir build && cd build
+	cmake -GXcode -DENABLE_TESTS=ON -DCMAKE_BUILD_TYPE=Release ..
+	cmake --build . --config Release
+
+fftw-3.3.8/
+	downloaded from http://www.fftw.org/fftw-3.3.8.tar.gz
+	(via http://www.fftw.org/download.html)
+
+	compiled as:
+	./configure --enable-sse2 --enable-avx --enable-avx2
+		(I tried --enable-avx-128-fma --enable-generic-simd128 --enable-generic-simd256 and it came out slower?)
+		(There are more flags on the FFTW site, but I couldn't get them to build)

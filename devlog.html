@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Let's write an FFT implementation</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link href="/style/article/style.css" rel="stylesheet">
+		<script src="/style/article/style.js"></script>
+		<!-- FFT diagrams -->
+		<script src="/style/article/diagram.js"></script>
+		<script src="/style/article/js-plot/plot.js"></script>
+		<script>
+			Diagram.prototype.butterfly = function(x, y, stride) {
+				stride = stride || 1;
+				return this
+					.xSpace(x, x + 1, 3)
+					.ySpace(y, y + stride, 1)
+					.arrow(x, y, x + 1, y)
+					.arrow(x, y, x + 1, y + stride)
+					.arrow(x, y + stride, x + 1, y)
+					.arrow(x, y + stride, x + 1, y + stride)
+			};
+			Diagram.prototype.butterflies = function(x, y, stride, repeats) {
+				repeats = repeats || 1;
+				for (let i = 0; i < stride*repeats*2 - 1; i++) {
+					this.ySpace(y + i, y + i + 1, 1);
+				}
+				for (let r = 0; r < repeats; r++) {
+					for (let i = 0; i < stride; i++) {
+						this.butterfly(x, y + i + r*stride*2, stride);
+					}
+				}
+				return this;
+			};
+			Diagram.prototype.column = function (x, y, text) {
+				text.forEach((row, i) => {
+					this.text(x, y + i, row);
+				});
+				return this;
+			}
+
+			Diagram.setup(diagram => diagram.style(`
+				.twiddle-index {
+					fill: #820;
+				}
+				text.highlight {
+					fill: #2186B9; font-weight: 800
+				}
+			`));
+		</script>
+		<style>
+			svg text.svg-equation-unknown {
+				fill: inherit;
+			}
+			.twiddle-index {
+				fill: #820;
+			}
+			text.highlight {
+				fill: #2186B9; font-weight: 800
+			}
+		</style>
+	</head>
+	<body>
+		<article class="main">
+			<header>
+				<h1>Let's write an FFT implementation</h1>
+				<address>Geraint Luff</address>
+				<time>2020-05-13</time>
+
+				<section class="abstract">
+					<p>FFTs are just really neat, so we're going to write one!</p>
+					<p>We don't need it to be full-featured, but we'd like it to be reasonably fast, and (most importantly) short and readable.</p>
+				</section>
+			</header>
+
+			<nav class="auto"></nav>
+
+			<aside>If you don't already understand what the Fourier Transform is, and why the FFT is useful, then this isn't the place to learn, because this is mostly focused on implementation.  Instead of being nitpicky, we will mostly be reasoning using diagrams, because it's clearer than wading through equations.</aside>
+			<h2>Organising the FFT graph</h2>
+			<p>When implementing the FFT, one of the major questions is how to organise the calculations.  For size <equation>2^N</equation>, you can use radix-2/radix-4/split-radix, as well as decimation in time/-frequency.  But they are all very similar under the hood - the only real differences are:</p>
+			<ul>
+				<li>the order of inputs/outputs</li>
+				<li>the twiddle-factors</li>
+			</ul>
+			<p>So let's look at both of those in turn:</p>
+			<h3>Twiddle-factor shuffling</h3>
+			<aside>I don't know what the proper term for this is, and "twiddle-factor shuffling" is how I've been thinking about it. &#x1f937;</aside>
+			<p>All variants of the Cooley-Tukey FFT algorithm involve <dfn>twiddle factors</dfn>.  We're not going into exactly what they are and why they exist, but are going to look at how to shuffle them around within the FFT graph.</p>
+			<p>Let's look at a single FFT butterfly, with multiplications before and after:</p>
+			<figure class="small">
+				<script>
+					Diagram()
+						.arrow(0, 0, 2, 0)
+						.arrow(0, 0, 2, 2)
+						.arrow(0, 2, 2, 0)
+						.arrow(0, 2, 2, 2)
+						.xSpace(0, 2, 2)
+						.ySpace(0, 2, 2)
+						.with('light', obj => obj
+							.arrow(-1, 0, 0, 0)
+							.arrow(-1, 2, 0, 2)
+							.arrow(2, 0, 3, 0)
+							.arrow(2, 2, 3, 2)
+						)
+						.text(0, 0, "\u00D7a")
+						.text(0, 2, "\u00D7b")
+						.text(2, 0, "\u00D7c")
+						.text(2, 2, "\u00D7d")
+						.with('sub', obj => obj
+							.text(1, 2, "-1")
+						)
+						.insert();
+				</script>
+			</figure>
+			<p>Since the operations are all linear, we could add an extra factor of <equation>W</equation> to both multiplications on the left, and a corresponding <equation>V = W^-1</equation> to the right, and our result would be the same:</p>
+			<figure class="small">
+				<script>
+					Diagram()
+						.arrow(0, 0, 2, 0)
+						.arrow(0, 0, 2, 2)
+						.arrow(0, 2, 2, 0)
+						.arrow(0, 2, 2, 2)
+						.xSpace(0, 2, 2)
+						.ySpace(0, 2, 2)
+						.with('light', obj => obj
+							.arrow(-1, 0, 0, 0)
+							.arrow(-1, 2, 0, 2)
+							.arrow(2, 0, 3, 0)
+							.arrow(2, 2, 3, 2)
+						)
+						.text(0, 0, "a\u00D7W")
+						.text(0, 2, "b\u00D7W")
+						.text(2, 0, "c/W")
+						.text(2, 2, "d/W")
+						.with('sub', obj => obj
+							.text(1, 2, "-1")
+						)
+						.insert();
+				</script>
+			</figure>
+			<h4>An example with N = 8</h4>
+			<p>The illustrate how this can work in practice, let's look at an <equation>N = 8</equation>, radix-2 FFT.  We have labelled it with the twiddle factors, where each number <equation>n</equation> means <equation>w_8^n = exp(-2\pi i \frac{n}{8})</equation>:</p>
+			<figure>
+				<script>
+					Diagram()
+						.butterflies(0, 0, 4)
+						.butterflies(1, 0, 2, 2)
+						.column(0, 0, 'x[0],x[1],x[2],x[3],x[4],x[5],x[6],x[7]'.split(','))
+						.with('twiddle-index', d => d
+							.column(1, 0, [0, 0, 0, 0, 0, '', 2, ''])
+							.column(2, 0, [0, 0, 0, 2, 0, '', 0, ''])
+						)
+						.with('highlight', d => d
+							.text(1, 5, '1')
+							.text(1, 7, '3')
+							.text(2, 5, '0')
+							.text(2, 7, '2')
+						)
+						.butterflies(2, 0, 1, 4)
+						.column(3, 0, 'X[0],X[4],X[2],X[6],X[1],X[5],X[3],X[7]'.split(','))
+						.insert();
+				</script>
+			</figure>
+			<p>We've highlighted four of the twiddle-factors at the bottom, which are connected by a butterfly.  If we multiply the left ones by <equation>w_8^{-1}</equation>, and the right ones by <equation>w_8^1</equation>, we get an equivalent FFT with different twiddle-factors:</p>
+			<figure>
+				<script>
+					Diagram()
+						.column(0, 0, 'x[0],x[1],x[2],x[3],x[4],x[5],x[6],x[7]'.split(','))
+						.butterflies(0, 0, 4)
+						.butterflies(1, 0, 2, 2)
+						.butterflies(2, 0, 1, 4)
+						.with('twiddle-index', d => d
+							.column(1, 0, [0, 0, 0, 0, 0, '', 2, ''])
+							.column(2, 0, [0, 0, 0, 2, 0, '', 0, ''])
+						)
+						.with('highlight', d => d
+							.text(1, 5, '0')
+							.text(1, 7, '2')
+							.text(2, 5, '1')
+							.text(2, 7, '3')
+						)
+						.column(3, 0, 'X[0],X[4],X[2],X[6],X[1],X[5],X[3],X[7]'.split(','))
+						.insert();
+				</script>
+			</figure>
+			<p>If we re-order the rows (across the entire diagram) so that the <em>outputs</em> are in-order instead of the inputs, we see that we have achieved is the classic decimation-in-frequency counterpart to our original graph:</p>
+			<figure>
+				<script>
+					Diagram()
+						.column(0, 0, 'x[0],x[4],x[2],x[6],x[1],x[5],x[3],x[7]'.split(','))
+						.butterflies(0, 0, 1, 4)
+						.butterflies(1, 0, 2, 2)
+						.butterflies(2, 0, 4)
+						.with('twiddle-index', d => d
+							.column(1, 0, [0, 0, 0, 2, 0, 0, 0, 2])
+							.column(2, 0, [0, 0, 0, 0, 0, 1, 2, 3])
+						)
+						.column(3, 0, 'X[0],X[1],X[2],X[3],X[4],X[5],X[6],X[7]'.split(','))
+						.insert();
+				</script>
+			</figure>
+
+			<h4>Radix-4</h4>
+			<p>Radix-4 butterflies are neat because all the factors required to calculate them are <equation>\plusminus 1</equation> or <equation>\plusminus i</equation>, which can be combined (free) with addition:</p>
+			<figure class="small">
+				<script>
+					Diagram()
+						.column(0, 0, 'x[0],x[1],x[2],x[3]'.split(','))
+						.butterflies(0, 0, 2)
+						.ySpace(1, 2, 2.5)
+						.arrow(1, 0, 2, 0)
+						.arrow(1, 1, 2, 1)
+						.arrow(1, 2, 2, 2)
+						 .column(1, 0, ['', '', '', ''])
+						.with('sub', obj => obj
+							.text(0.5, 2, "-1")
+							.text(0.5, 3, "-1")
+							.text(2.5, 1, "-1")
+							.text(2.5, 3, "-1")
+						)
+						.text(1.5, 3, '\u00D7 i')
+						.butterflies(2, 0, 1, 2)
+						.column(3, 0, 'X[0],X[2],X[1],X[3]'.split(','))
+						.insert();
+				</script>
+			</figure>
+			<p>However, the difference between radix-2 and radix-4 FFTs is again simply one of twiddle-factors.  Here is an <equation>N = 16</equation> radix-2 FFT (labelled with <equation>w_{16}^n = exp(2\pi i \frac{n}{16})</equation>, so that <equation>w_{16}^4 = i</equation>):</p>
+			<figure>
+				<script>
+					Diagram()
+						.yScale(0.8).xScale(1.2)
+						.column(0, 0, [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(i=>`x[${i}]`))
+						.column(4, 0, [0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,16].map(i=>`X[${i}]`))
+						.with('twiddle-index', d => d
+							.with('highlight', d => d
+								.column(1, 9, [1,2,3,'',5,6,7])
+								.column(2, 9, [0,0,0,'',2,4,6])
+							)
+							.column(1, 0, [0,0,0,0,0,0,0,0,0,'','','',4])
+							.column(2, 0, [0,0,0,0,0,2,4,6,0,'','','',0])
+							.column(3, 0, [0,0,0,4,0,0,0,4,0,0,0,4,0,0,0,4])
+						)
+						.butterflies(0, 0, 8)
+						.xSpace(0, 1, 5)
+						.butterflies(1, 0, 4, 2)
+						.xSpace(1, 2, 4)
+						.butterflies(2, 0, 2, 4)
+						.butterflies(3, 0, 1, 8)
+						.insert();
+				</script>
+			</figure>
+			<p>As you might have guessed from the highlighting, we're going to shuffle across the butterflies at the bottom, so that the first set of twiddle-factors are all <equation>w_{16}^0</equation> or <equation>w_{16}^4</equation>:</p>
+			<figure>
+				<script>
+					Diagram()
+						.yScale(0.8).xScale(1.2)
+						.column(0, 0, [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(i=>`x[${i}]`))
+						.column(4, 0, [0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,16].map(i=>`X[${i}]`))
+						.with('twiddle-index', d => d
+							.column(1, 0, [0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4])
+							.column(2, 0, [0,0,0,0,0,2,4,6,0,1,2,3,0,3,6,9])
+							.column(3, 0, [0,0,0,4,0,0,0,4,0,0,0,4,0,0,0,4])
+						)
+						.butterflies(0, 0, 8)
+						.xSpace(0, 1, 5)
+						.butterflies(1, 0, 4, 2)
+						.xSpace(1, 2, 4)
+						.butterflies(2, 0, 2, 4)
+						.butterflies(3, 0, 1, 8)
+						.insert();
+				</script>
+			</figure>
+			<p>This is now equivalent to the radix-4 FFT.  We have 4 radix-4 butterflies across the left two steps (e.g. <equation>(x[0], x[4], x[8], x[12])</equation> - remember <equation>w_{16}^4 = i</equation>), and four on the right, with twiddle-factors in between.</p>
+			
+			<h4>Split-radix</h4>
+			<p>Rather than radix-2/radix-4, we will actually be shuffling our twiddle-factors around to make them equivalent to <a href="https://en.wikipedia.org/wiki/Split-radix_FFT_algorithm">split-radix</a>.  While this is not the architecture with the fewest operations, it is better than either radix-2 and radix-4.</p>
+			<aside><details>
+				<summary>Optimal operation count</summary>
+				<p>The architecture with the smallest number of operations is a variant of split-radix.  Ordinary split-radix separates <equation>\sum w_N^{kn} x_n</equation> into:</p>
+				<figure>
+					<equation>\sum w_N^{2kn} x_{2n} + w_N^1 (\sum w_N^{4kn} x_{4n + 1}) + w_N^3 (\sum w_N^{4kn} x_{4n + 3})</equation>
+				</figure>
+				<p>The variant uses a different ordering for the third term:</p>
+				<figure>
+					<equation>\sum w_N^{2kn} x_{2n} + w_N^1 (\sum w_N^{4kn} x_{4n + 1}) + w_N^{-1} (\sum w_N^{4kn} x_{4n - 1})</equation>
+				</figure>
+
+				<p>With this, the twiddle-factors at certain points end up in conjugate pairs, which opens up another optimisation (scaling up so that either the real or imaginary part of the twiddles are 1).</p>
+				<p>This uses about 5% fewer operations than ordinary split-radix (<equation>\frac{34}{9} N log_2(N)</equation> instead of <equation>4 N log_2(N)</equation>), however it makes the permutation of the results slightly more complicated, in a way which isn't helpful for us.</p>
+				<p>We're going to stick to ordinary split-radix.</p>
+			</details></aside>
+			<hr>
+
+			<h3>Execution order</h3>
+			<p>The diagrams here show the order of operations for the <em>data flow</em>, but it says nothing about the order things are actually calculated.  A radix-4-style implementation will calculate two radix-2 steps at a time - but that execution order is not inherently tied to the arrangement of twiddle-factors.</p>
+			<p>We are going to take advantage of that, by using the twiddle-factor organisation for split-radix (which is normally expressed recursively), but executing them in a more straightforward radix-2 or radix-4 blocks.</p>
+
+			<h3>Out-of-place calculation</h3>
+			<p>The butterflies above always map a pair of inputs to the vertical position.  This makes them suitable for in-order calculation, because once you've calculated that butterfly, you are free to overwrite the inputs because you don't need them any more.</p>
+			<p>Here's a radix-2 FFT, with out-of-order results, which can therefore be calculated in-place:</p>
+			<figure class="small">
+				<script>
+					Diagram()
+						.column(0, 0, 'x[0],x[1],x[2],x[3]'.split(','))
+						.butterflies(0, 0, 2)
+						.column(1, 0, [0, 0, 0, 2])
+						.butterflies(1, 0, 1, 2)
+						.column(2, 0, 'X[0],X[2],X[1],X[3]'.split(','))
+						.insert();
+				</script>
+			</figure>
+			<p>If you're doing your calculations out-of-place (i.e. each stage in the FFT flips between two internal buffers), you can re-order the outputs however you like.  Here's the same FFT, but with in-order results:</p>
+			<figure>
+				<script>
+					Diagram()
+						.column(0, 0, 'x[0],x[1],x[2],x[3]'.split(','))
+						.butterflies(0, 0, 2)
+						.column(1, 0, [0, 0, 0, 2])
+						.xSpace(1, 2, 2.5)
+						.arrow(1, 0, 2, 0)
+						.arrow(1, 1, 2, 0)
+						.arrow(1, 0, 2, 2)
+						.arrow(1, 1, 2, 2)
+						.arrow(1, 2, 2, 1)
+						.arrow(1, 3, 2, 1)
+						.arrow(1, 2, 2, 3)
+						.arrow(1, 3, 2, 3)
+						.column(2, 0, 'X[0],X[1],X[2],X[3]'.split(','))
+						.insert();
+				</script>
+			</figure>
+			<p>This is commonly used to produce in-order outputs, to avoid a separate permutation step.  However, we're going to use it for something different: avoiding branches!</p>
+
+			<h2 id="comparison">Benchmarks</h2>
+			<script>
+				let benchmarks = {};
+				function addResults(info, rates) {
+					benchmarks[info] = rates;
+				}
+			</script>
+			<script src="out/results/signalsmith.js"></script>
+			<script src="out/results/dev-history-direct.js"></script>
+			<figure>
+				<script>
+					var plot = new Plot();
+					function addLine(label, data) {
+						plot.line(data.map(x => x.size), data.map(y => y.rate)).label(label);
+					}
+					["Signalsmith", "Direct"].forEach(key => {
+						if (benchmarks[key]) addLine(key, benchmarks[key]);
+					});
+					plot.insert({
+						x: {scale: 'log', major: 1, label: 'size', tick: [1, 4, 16, 64]},
+						y: {major: 0, tick: [0], label: 'normalised rate'}
+					});
+				</script>
+			</figure>
+
+			<footer class="citations"></footer>
+		</article>
+	</body>
+</html>

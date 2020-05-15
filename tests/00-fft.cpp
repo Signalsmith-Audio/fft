@@ -40,14 +40,6 @@ TEST("2^N bins", test_2N_bins) {
 	}
 }
 
-template<typename T>
-std::complex<T> randomComplex() {
-	std::complex<T> r;
-	r.real(rand()/(double)RAND_MAX - 0.5);
-	r.imag(rand()/(double)RAND_MAX - 0.5);
-	return r;
-}
-
 TEST("2^N linearity", test_2N_linearity) {
 	using signalsmith::FFT;
 	using std::vector;
