@@ -338,6 +338,7 @@
 				}
 			</script>
 			<script src="out/results/signalsmith.js"></script>
+			<script src="out/results/kissfft.js"></script>
 			<script src="out/results/dev-history-direct.js"></script>
 			<script src="out/results/dev-history-unspecialised.js"></script>
 			<figure>
@@ -347,7 +348,7 @@
 						data.sort((a, b) => a.size - b.size);
 						plot.line(data.map(x => x.size), data.map(y => y.rate)).label(label);
 					}
-					["Signalsmith", "Direct", "Unspecialised"].forEach(key => {
+					["Signalsmith", "Direct", "Unspecialised", "KissFFT"].forEach(key => {
 						if (benchmarks[key]) addLine(key, benchmarks[key]);
 					});
 					plot.insert({

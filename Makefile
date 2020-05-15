@@ -23,7 +23,7 @@ out/test: *.h $(shell find tests -iname "*.h") $(shell find tests -iname "*.cpp"
 
 ############## Benchmark ##############
 
-BENCHMARK_CPP_FILES := benchmark/benchmark.cpp
+BENCHMARK_CPP_FILES := benchmark/*.cpp
 
 benchmark: out/benchmark
 	mkdir -p out/results

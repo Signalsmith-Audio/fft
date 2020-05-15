@@ -40,9 +40,6 @@ namespace signalsmith {
 						break;
 					}
 				}
-				// if (size%2 == 0) {
-				// 	stepSize = 2;
-				// }
 				size_t twiddleOffset = twiddles.size();
 				plan.push_back({stepSize, twiddleOffset});
 				double phaseStep = 2*M_PI/size;
@@ -119,7 +116,7 @@ namespace signalsmith {
 	
 			// Go through the steps
 			for (const Step& step : plan) {
-				if (false && step.N == 2) {
+				if (step.N == 2) {
 					fftStep2<inverse>(A, B);
 				} else {
 					fftStepGeneric<inverse>(A, B, step.N);
