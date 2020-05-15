@@ -78,3 +78,37 @@ TEST("2^N linearity", test_2N_linearity) {
 		}
 	}
 }
+
+TEST("Inverse", inverse) {
+	using signalsmith::FFT;
+
+	std::vector<int> sizes = {1, 2, 4, 8, 16, 32, 64, 128, 256};
+	
+	for (int size : sizes) {
+		std::vector<std::complex<double>> input(size);
+		std::vector<std::complex<double>> spectrum(size);
+		std::vector<std::complex<double>> output(size);
+		std::vector<std::complex<double>> expected(size);
+
+		for (int i = 0; i < size; i++) {
+			input[i] = randomComplex<double>();
+			double freq = 1;
+			double phase = 2*M_PI*i*freq/size;
+			input[i] = {cos(phase), sin(phase)};
+			expected[i] = input[i]*(double)size;
+		}
+
+		FFT<double> fft(size);
+		fft.fft(input, spectrum);
+		fft.ifft(spectrum, output);
+
+		if (!closeEnough(output, expected)) {
+			printArray(input);
+			printArray(spectrum);
+			std::cout << size << "\n";
+			printArray(output);
+			printArray(expected);
+			return test.fail("inverse did not match");
+		}
+	}
+}

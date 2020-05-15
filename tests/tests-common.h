@@ -27,6 +27,16 @@ bool closeEnough(std::vector<std::complex<T>> vectorA, std::vector<std::complex<
 		totalError += error;
 	}
 
+	if (!totalEnergy) return true;
 	T errorRatio = sqrt(totalError/totalEnergy);
 	return errorRatio < 1e-6;
+}
+
+template<typename T>
+static void printArray(std::vector<T> array, bool newline=true) {
+	for (unsigned int i = 0; i < array.size(); ++i) {
+		if (i > 0) std::cout << "\t";
+		std::cout << array[i];
+	}
+	if (newline) std::cout << std::endl;
 }
