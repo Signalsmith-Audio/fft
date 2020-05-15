@@ -343,6 +343,7 @@
 				<script>
 					var plot = new Plot();
 					function addLine(label, data) {
+						data.sort((a, b) => a.size - b.size);
 						plot.line(data.map(x => x.size), data.map(y => y.rate)).label(label);
 					}
 					["Signalsmith", "Direct"].forEach(key => {

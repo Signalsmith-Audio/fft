@@ -5,12 +5,22 @@
 
 #include "tests-common.h"
 
-TEST("2^N bins", test_2N_bins) {
+std::vector<int> testSizes() {
+	return {
+		1, 2, 4, 8, 16, 32, 64, 128, 256,
+		3, 6, 9, 12, 18, 24,
+		5, 10, 15, 20, 25,
+		7, 14, 21, 28,
+		11, 13, 17, 19, 22, 23
+	};
+}
+
+TEST("Individual bins", test_2N_bins) {
 	using signalsmith::FFT;
 	using std::vector;
 	using std::complex;
 
-	std::vector<int> sizes = {1, 2, 4, 8, 16, 32, 64, 128, 256};
+	std::vector<int> sizes = testSizes();
 	
 	for (int size : sizes) {
 		vector<complex<double>> input(size);
@@ -34,18 +44,26 @@ TEST("2^N bins", test_2N_bins) {
 				return test.fail("input was changed");
 			}
 			if (!closeEnough(output, expected)) {
+				std::cout << "N = " << size << "\n";
+				std::cout << "   input:\t";
+				printArray(input);
+				std::cout << "  output:\t";
+				printArray(output);
+				std::cout << "expected:\t";
+				printArray(expected);
+
 				return test.fail("output != expected");
 			}
 		}
 	}
 }
 
-TEST("2^N linearity", test_2N_linearity) {
+TEST("Linearity", test_2N_linearity) {
 	using signalsmith::FFT;
 	using std::vector;
 	using std::complex;
 
-	std::vector<int> sizes = {1, 2, 4, 8, 16, 32, 64, 128, 256};
+	std::vector<int> sizes = testSizes();
 	
 	for (int size : sizes) {
 		vector<complex<double>> inputA(size);
@@ -82,7 +100,7 @@ TEST("2^N linearity", test_2N_linearity) {
 TEST("Inverse", inverse) {
 	using signalsmith::FFT;
 
-	std::vector<int> sizes = {1, 2, 4, 8, 16, 32, 64, 128, 256};
+	std::vector<int> sizes = testSizes();
 	
 	for (int size : sizes) {
 		std::vector<std::complex<double>> input(size);
