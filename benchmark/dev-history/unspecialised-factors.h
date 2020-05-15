@@ -2,18 +2,7 @@
 #include <complex>
 #include <cmath>
 
-namespace signalsmith {
-	// template<typename T>
-	// static void printArray(std::complex<T>* array, size_t size, bool newline=true) {
-	// 	for (unsigned int i = 0; i < size; ++i) {
-	// 		std::complex<T> value = array[i];
-	// 		if (abs(value.real()) < 1e-10) value.real(0);
-	// 		if (abs(value.imag()) < 1e-10) value.imag(0);
-	// 		if (i > 0) std::cout << "\t";
-	// 		std::cout << value;
-	// 	}
-	// 	if (newline) std::cout << std::endl;
-	// }
+namespace dev_unspecialised_factors {
 
 	template<typename V>
 	class FFT {

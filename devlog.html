@@ -339,6 +339,7 @@
 			</script>
 			<script src="out/results/signalsmith.js"></script>
 			<script src="out/results/dev-history-direct.js"></script>
+			<script src="out/results/dev-history-unspecialised.js"></script>
 			<figure>
 				<script>
 					var plot = new Plot();
@@ -346,12 +347,12 @@
 						data.sort((a, b) => a.size - b.size);
 						plot.line(data.map(x => x.size), data.map(y => y.rate)).label(label);
 					}
-					["Signalsmith", "Direct"].forEach(key => {
+					["Signalsmith", "Direct", "Unspecialised"].forEach(key => {
 						if (benchmarks[key]) addLine(key, benchmarks[key]);
 					});
 					plot.insert({
-						x: {scale: 'log', major: 1, label: 'size', tick: [1, 4, 16, 64]},
-						y: {major: 0, tick: [0], label: 'normalised rate'}
+						x: {scale: 'log', min: 1, major: 1, label: 'size', tick: [1, 4, 16, 64]},
+						y: {major: 0, min: 0, tick: [0], label: 'normalised rate'}
 					});
 				</script>
 			</figure>
