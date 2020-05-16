@@ -7,7 +7,7 @@
 #define SIGNALSMITH_INLINE __attribute__((always_inline)) inline
 #endif
 
-namespace signalsmith {
+namespace dev_specialised235 {
 
 	namespace perf {
 		// Complex multiplication has edge-cases around Inf/NaN - handling those properly makes std::complex non-inlineable, so we use our own
@@ -190,9 +190,11 @@ namespace signalsmith {
 		void run(complex const *input, complex *output) {
 			using std::swap;
 
-			bool oddSteps = (plan.size()%2);
-			const complex *A = input;
-			complex *B = oddSteps ? working.data() : output, *other = oddSteps ? output : working.data();
+			// Copy the input in
+			complex *A = output, *B = working.data();
+			for (size_t i = 0; i < _size; i++) {
+				A[i] = input[i];
+			}
 	
 			// Go through the steps
 			for (const Step& step : plan) {
@@ -205,13 +207,20 @@ namespace signalsmith {
 				} else {
 					fftStepGeneric<inverse>(A, B, step);
 				}
-				A = B;
-				swap(B, other);
+				swap(A, B);
 			}
 
 			// Un-permute the result
 			for (size_t i = 0; i < _size; i++) {
 				B[permutation[i]] = A[i];
+			}
+			swap(A, B);
+
+			// Copy the output
+			if (A != output) {
+				for (size_t i = 0; i < _size; i++) {
+					output[i] = A[i];
+				}
 			}
 		}
 
