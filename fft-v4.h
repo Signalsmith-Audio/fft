@@ -11,48 +11,28 @@ namespace signalsmith {
 
 	namespace perf {
 		// Complex multiplication has edge-cases around Inf/NaN - handling those properly makes std::complex non-inlineable, so we use our own
-		template <bool conjugateSecond, typename sampleType>
-		SIGNALSMITH_INLINE std::complex<sampleType> complexMul(const std::complex<sampleType> &A, const std::complex<sampleType> &B) {
-			if (conjugateSecond) {
-				return std::complex<sampleType>{
-					B.real()*A.real() + B.imag()*A.imag(),
-					B.real()*A.imag() - B.imag()*A.real()
-				};
-			} else {
-				return std::complex<sampleType>{
-					A.real()*B.real() - A.imag()*B.imag(),
-					A.real()*B.imag() + A.imag()*B.real()
-				};
-			}
+		template <bool conjugateSecond, typename V>
+		SIGNALSMITH_INLINE std::complex<V> complexMul(const std::complex<V> &a, const std::complex<V> &b) {
+			return conjugateSecond ? std::complex<V>{
+				b.real()*a.real() + b.imag()*a.imag(),
+				b.real()*a.imag() - b.imag()*a.real()
+			} : std::complex<V>{
+				a.real()*b.real() - a.imag()*b.imag(),
+				a.real()*b.imag() + a.imag()*b.real()
+			};
 		}
 
 		template<bool flipped, typename V>
 		SIGNALSMITH_INLINE std::complex<V> complexAddI(const std::complex<V> &a, const std::complex<V> &b) {
-			if (flipped) {
-				return {
-					a.real() + b.imag(),
-					a.imag() - b.real()
-				};
-			} else {
-				return {
-					a.real() - b.imag(),
-					a.imag() + b.real()
-				};
-			}
+			return flipped ? std::complex<V>{
+				a.real() + b.imag(),
+				a.imag() - b.real()
+			} : std::complex<V>{
+				a.real() - b.imag(),
+				a.imag() + b.real()
+			};
 		}
 	}
-
-	// template<typename T>
-	// static void printArray(std::complex<T>* array, size_t size, bool newline=true) {
-	// 	for (unsigned int i = 0; i < size; ++i) {
-	// 		std::complex<T> value = array[i];
-	// 		if (abs(value.real()) < 1e-10) value.real(0);
-	// 		if (abs(value.imag()) < 1e-10) value.imag(0);
-	// 		if (i > 0) std::cout << "\t";
-	// 		std::cout << value;
-	// 	}
-	// 	if (newline) std::cout << std::endl;
-	// }
 
 	template<typename V>
 	class FFT {
@@ -89,12 +69,10 @@ namespace signalsmith {
 				size_t twiddleOffset = twiddles.size();
 				double phaseStep = 2*M_PI/size;
 				for (size_t i = 0; i < size/stepSize; i++) {
-					// for (size_t r = 0; r < twiddleRepeats; r++) {
-						for (size_t bin = 0; bin < stepSize; bin++) {
-							double twiddlePhase = phaseStep*bin*i;
-							twiddles.push_back({cos(twiddlePhase), -sin(twiddlePhase)});
-						}
-					// }
+					for (size_t bin = 0; bin < stepSize; bin++) {
+						double twiddlePhase = phaseStep*bin*i;
+						twiddles.push_back({cos(twiddlePhase), -sin(twiddlePhase)});
+					}
 				}	
 
 				plan.push_back({stepSize, twiddleOffset, twiddleRepeats});
@@ -237,6 +215,7 @@ namespace signalsmith {
 				twiddles += 5;
 			}
 		}
+		
 		template<bool inverse>
 		void run(complex const *input, complex *output) {
 			using std::swap;
