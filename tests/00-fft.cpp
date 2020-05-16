@@ -10,10 +10,11 @@ std::vector<int> testSizes() {
 		1, 2, 4, 8, 16, 32, 64, 128, 256,
 		3, 6, 9, 12, 18, 24,
 		5, 10, 15, 20, 25,
-		7, 14, 21, 28,
+		7, 14, 21, 28, 49,
 		11, 13, 17, 19, 22, 23
 	};
 }
+
 
 TEST("Individual bins", test_2N_bins) {
 	using signalsmith::FFT;

@@ -25,7 +25,7 @@ out/test: *.h $(shell find tests -iname "*.h") $(shell find tests -iname "*.cpp"
 
 BENCHMARK_CPP_FILES := benchmark/benchmark.cpp
 
-benchmark: out/benchmark
+benchmark: test out/benchmark
 	mkdir -p out/results
 	cd out && ./benchmark --test-time=0.01
 
