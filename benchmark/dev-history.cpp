@@ -44,3 +44,7 @@ Benchmark<DevHistory<dev_specialised23::FFT, specialised23Name, specialised23Tag
 char specialised235Name[] = "Radix-2/3/5", specialised235Tag[] = "dev-history-specialised235";
 Benchmark<DevHistory<dev_specialised235::FFT, specialised235Name, specialised235Tag>, (1<<18)> benchSpecialised235;
 
+#include "dev-history/memory-ping-pong.h"
+char pingpongName[] = "Ping-pong", pingpongTag[] = "dev-history-ping-pong";
+Benchmark<DevHistory<dev_memory_pingpong::FFT, pingpongName, pingpongTag>, (1<<18)> benchPingPong;
+

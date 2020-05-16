@@ -7,7 +7,7 @@
 #define SIGNALSMITH_INLINE __attribute__((always_inline)) inline
 #endif
 
-namespace signalsmith {
+namespace dev_memory_pingpong {
 
 	namespace perf {
 		// Complex multiplication has edge-cases around Inf/NaN - handling those properly makes std::complex non-inlineable, so we use our own
@@ -26,20 +26,6 @@ namespace signalsmith {
 			}
 		}
 
-		template<bool flipped, typename V>
-		SIGNALSMITH_INLINE std::complex<V> complexAddI(const std::complex<V> &a, const std::complex<V> &b) {
-			if (flipped) {
-				return {
-					a.real() + b.imag(),
-					a.imag() - b.real()
-				};
-			} else {
-				return {
-					a.real() - b.imag(),
-					a.imag() + b.real()
-				};
-			}
-		}
 	}
 
 	// template<typename T>
@@ -63,7 +49,6 @@ namespace signalsmith {
 		struct Step {
 			size_t N;
 			size_t twiddleOffset;
-			size_t twiddleRepeats;
 		};
 		std::vector<Step> plan;
 		std::vector<complex> twiddles;
@@ -74,14 +59,10 @@ namespace signalsmith {
 			size_t size = _size;
 			while (size > 1) {
 				size_t stepSize = size;
-				if (size%4 == 0) {
-					stepSize = 4;
-				} else {
-					for (size_t divisor = 2; divisor <= sqrt(size); ++divisor) {
-						if (size%divisor == 0) {
-							stepSize = divisor;
-							break;
-						}
+				for (size_t divisor = 2; divisor <= sqrt(size); ++divisor) {
+					if (size%divisor == 0) {
+						stepSize = divisor;
+						break;
 					}
 				}
 				size_t twiddleRepeats = _size/size;
@@ -89,15 +70,15 @@ namespace signalsmith {
 				size_t twiddleOffset = twiddles.size();
 				double phaseStep = 2*M_PI/size;
 				for (size_t i = 0; i < size/stepSize; i++) {
-					// for (size_t r = 0; r < twiddleRepeats; r++) {
+					for (size_t r = 0; r < twiddleRepeats; r++) {
 						for (size_t bin = 0; bin < stepSize; bin++) {
 							double twiddlePhase = phaseStep*bin*i;
 							twiddles.push_back({cos(twiddlePhase), -sin(twiddlePhase)});
 						}
-					// }
+					}
 				}	
 
-				plan.push_back({stepSize, twiddleOffset, twiddleRepeats});
+				plan.push_back({stepSize, twiddleOffset});
 				size /= stepSize;
 			}
 
@@ -122,23 +103,21 @@ namespace signalsmith {
 			const complex *twiddles = &this->twiddles[step.twiddleOffset];
 
 			size_t stride = _size/stepSize;
-			const complex *end = input + stride;
-			while (input != end) {
-				for (size_t repeat = 0; repeat < step.twiddleRepeats; ++repeat) {
-					for (size_t bin = 0; bin < stepSize; ++bin) {
-						complex sum = input[0];
-						for (size_t i = 1; i < stepSize; ++i) {
-							V phase = 2*M_PI*bin*i/stepSize;
-							complex factor = {cos(phase), -sin(phase)};
-							sum += perf::complexMul<inverse>(input[i*stride], factor);
-						}
-
-						output[bin] = perf::complexMul<inverse>(sum, twiddles[bin]);
+			for (size_t offset = 0; offset < stride; offset++) {
+				for (size_t bin = 0; bin < stepSize; ++bin) {
+					complex sum = input[0];
+					for (size_t i = 1; i < stepSize; ++i) {
+						V phase = 2*M_PI*bin*i/stepSize;
+						complex factor = {cos(phase), -sin(phase)};
+						sum += perf::complexMul<inverse>(input[i*stride], factor);
 					}
-					++input;
-					output += stepSize;
+
+					output[bin] = perf::complexMul<inverse>(sum, twiddles[bin]);
 				}
 				twiddles += stepSize;
+
+				input += 1;
+				output += stepSize;
 			}
 		}
 
@@ -149,14 +128,12 @@ namespace signalsmith {
 
 			complex const *end = input + stride;
 			while (input != end) {
-				for (size_t repeat = 0; repeat < step.twiddleRepeats; ++repeat) {
-					complex A = input[0], B = input[stride];
+				complex A = input[0], B = input[stride];
 
-					output[0] = A + B;
-					output[1] = perf::complexMul<inverse>(A - B, twiddles[1]);
-					++input;
-					output += 2;
-				}
+				output[0] = A + B;
+				output[1] = perf::complexMul<inverse>(A - B, twiddles[1]);
+				++input;
+				output += 2;
 				twiddles += 2;
 			}
 		}
@@ -170,42 +147,16 @@ namespace signalsmith {
 
 			complex const *end = input + stride;
 			while (input != end) {
-				for (size_t repeat = 0; repeat < step.twiddleRepeats; ++repeat) {
-					complex A = input[0], B = input[stride], C = input[stride*2];
-					complex realSum = A + (B + C)*factor3.real();
-					complex imagSum = (B - C)*factor3.imag();
+				complex A = input[0], B = input[stride], C = input[stride*2];
+				complex realSum = A + (B + C)*factor3.real();
+				complex imagSum = (B - C)*factor3.imag();
 
-					output[0] = A + B + C;
-					output[1] = perf::complexMul<inverse>(perf::complexAddI<false>(realSum, imagSum), twiddles[1]);
-					output[2] = perf::complexMul<inverse>(perf::complexAddI<true>(realSum, imagSum), twiddles[2]);
-					++input;
-					output += 3;
-				}
+				output[0] = A + B + C;
+				output[1] = perf::complexMul<inverse>(complex{realSum.real() - imagSum.imag(), realSum.imag() + imagSum.real()}, twiddles[1]);
+				output[2] = perf::complexMul<inverse>(complex{realSum.real() + imagSum.imag(), realSum.imag() - imagSum.real()}, twiddles[2]);
+				++input;
+				output += 3;
 				twiddles += 3;
-			}
-		}
-
-		template<bool inverse>
-		void fftStep4(complex const *input, complex *output, const Step &step) {
-			const complex *twiddles = &this->twiddles[step.twiddleOffset];
-			size_t stride = _size/4;
-
-			complex const *end = input + stride;
-			while (input != end) {
-				for (size_t repeat = 0; repeat < step.twiddleRepeats; ++repeat) {
-					complex A = input[0], B = input[stride], C = input[stride*2], D = input[stride*3];
-
-					complex sumAC = A + C, sumBD = B + D;
-					complex diffAC = A - C, diffBD = B - D;
-
-					output[0] = sumAC + sumBD;
-					output[1] = perf::complexMul<inverse>(perf::complexAddI<!inverse>(diffAC, diffBD), twiddles[1]);
-					output[2] = perf::complexMul<inverse>(sumAC - sumBD, twiddles[2]);
-					output[3] = perf::complexMul<inverse>(perf::complexAddI<inverse>(diffAC, diffBD), twiddles[3]);
-					++input;
-					output += 4;
-				}
-				twiddles += 4;
 			}
 		}
 
@@ -219,21 +170,19 @@ namespace signalsmith {
 
 			complex const *end = input + stride;
 			while (input != end) {
-				for (size_t repeat = 0; repeat < step.twiddleRepeats; ++repeat) {
-					complex A = input[0], B = input[stride], C = input[stride*2], D = input[stride*3], E = input[stride*4];
-					complex realSum1 = A + (B + E)*factor5a.real() + (C + D)*factor5b.real();
-					complex imagSum1 = (B - E)*factor5a.imag() + (C - D)*factor5b.imag();
-					complex realSum2 = A + (B + E)*factor5b.real() + (C + D)*factor5a.real();
-					complex imagSum2 = (B - E)*factor5b.imag() + (D - C)*factor5a.imag();
+				complex A = input[0], B = input[stride], C = input[stride*2], D = input[stride*3], E = input[stride*4];
+				complex realSum1 = A + (B + E)*factor5a.real() + (C + D)*factor5b.real();
+				complex imagSum1 = (B - E)*factor5a.imag() + (C - D)*factor5b.imag();
+				complex realSum2 = A + (B + E)*factor5b.real() + (C + D)*factor5a.real();
+				complex imagSum2 = (B - E)*factor5b.imag() + (D - C)*factor5a.imag();
 
-					output[0] = A + B + C + D + E;
-					output[1] = perf::complexMul<inverse>(perf::complexAddI<false>(realSum1, imagSum1), twiddles[1]);
-					output[2] = perf::complexMul<inverse>(perf::complexAddI<false>(realSum2, imagSum2), twiddles[2]);
-					output[3] = perf::complexMul<inverse>(perf::complexAddI<true>(realSum2, imagSum2), twiddles[3]);
-					output[4] = perf::complexMul<inverse>(perf::complexAddI<true>(realSum1, imagSum1), twiddles[4]);
-					++input;
-					output += 5;
-				}
+				output[0] = A + B + C + D + E;
+				output[1] = perf::complexMul<inverse>(complex{realSum1.real() - imagSum1.imag(), realSum1.imag() + imagSum1.real()}, twiddles[1]);
+				output[2] = perf::complexMul<inverse>(complex{realSum2.real() - imagSum2.imag(), realSum2.imag() + imagSum2.real()}, twiddles[2]);
+				output[3] = perf::complexMul<inverse>(complex{realSum2.real() + imagSum2.imag(), realSum2.imag() - imagSum2.real()}, twiddles[3]);
+				output[4] = perf::complexMul<inverse>(complex{realSum1.real() + imagSum1.imag(), realSum1.imag() - imagSum1.real()}, twiddles[4]);
+				++input;
+				output += 5;
 				twiddles += 5;
 			}
 		}
@@ -251,8 +200,6 @@ namespace signalsmith {
 					fftStep2<inverse>(A, B, step);
 				} else if (step.N == 3) {
 					fftStep3<inverse>(A, B, step);
-				} else if (step.N == 4) {
-					fftStep4<inverse>(A, B, step);
 				} else if (step.N == 5) {
 					fftStep5<inverse>(A, B, step);
 				} else {

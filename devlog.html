@@ -343,6 +343,7 @@
 			<script src="out/results/dev-history-unspecialised.js"></script>
 			<script src="out/results/dev-history-specialised23.js"></script>
 			<script src="out/results/dev-history-specialised235.js"></script>
+			<script src="out/results/dev-history-ping-pong.js"></script>
 			<figure>
 				<script>
 					var plot = new Plot();
@@ -350,7 +351,7 @@
 						data.sort((a, b) => a.size - b.size);
 						plot.line(data.map(x => x.size), data.map(y => y.rate)).label(label);
 					}
-					["Signalsmith", "Direct", "Unspecialised", "Radix-2/3", "Radix-2/3/5", "KissFFT"].forEach(key => {
+					["Signalsmith", "Direct", "Unspecialised", "Radix-2/3", "Radix-2/3/5", "Ping-pong", "KissFFT"].forEach(key => {
 						if (benchmarks[key]) addLine(key, benchmarks[key]);
 					});
 					plot.insert({
