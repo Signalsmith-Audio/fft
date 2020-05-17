@@ -10,6 +10,7 @@ struct Benchmark {
 		std::vector<int> possibleSizes(0);
 		int size = 1;
 		int maxSize = std::min(constMaxSize, (1<<24));
+		maxSize = std::min(constMaxSize, (1<<16));
 		while (size <= maxSize) {
 			possibleSizes.push_back(size);
 			size *= 2;
