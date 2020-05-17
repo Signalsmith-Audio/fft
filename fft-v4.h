@@ -40,7 +40,10 @@ namespace signalsmith {
 		size_t _size;
 		std::vector<complex> working;
 
+		enum class StepType {butterfly2, butterfly3, butterfly4, butterfly5, butterflyGeneric};
+		
 		struct Step {
+			StepType type;
 			size_t N;
 			size_t twiddleOffset;
 			size_t twiddleRepeats;
@@ -75,7 +78,12 @@ namespace signalsmith {
 					}
 				}	
 
-				plan.push_back({stepSize, twiddleOffset, twiddleRepeats});
+				StepType type = StepType::butterflyGeneric;
+				if (stepSize == 2) type = StepType::butterfly2;
+				if (stepSize == 3) type = StepType::butterfly3;
+				if (stepSize == 4) type = StepType::butterfly4;
+				if (stepSize == 5) type = StepType::butterfly5;
+				plan.push_back({type, stepSize, twiddleOffset, twiddleRepeats});
 				size /= stepSize;
 			}
 
@@ -215,33 +223,43 @@ namespace signalsmith {
 				twiddles += 5;
 			}
 		}
-		
+
 		template<bool inverse>
 		void run(complex const *input, complex *output) {
 			using std::swap;
 
-			bool oddSteps = (plan.size()%2);
 			const complex *A = input;
-			complex *B = oddSteps ? working.data() : output, *other = oddSteps ? output : working.data();
+			// Choose the starting state for the ping-pong pattern, so the result ends up in the output
+			bool oddSteps = (plan.size()%2);
+			complex *B = oddSteps ? working.data() : output;
+			complex *other = oddSteps ? output : working.data();
 	
 			// Go through the steps
 			for (const Step& step : plan) {
-				if (step.N == 2) {
+				switch (step.type) {
+				case StepType::butterfly2:
 					fftStep2<inverse>(A, B, step);
-				} else if (step.N == 3) {
+					break;
+				case StepType::butterfly3:
 					fftStep3<inverse>(A, B, step);
-				} else if (step.N == 4) {
+					break;
+				case StepType::butterfly4:
 					fftStep4<inverse>(A, B, step);
-				} else if (step.N == 5) {
+					break;
+				case StepType::butterfly5:
 					fftStep5<inverse>(A, B, step);
-				} else {
+					break;
+				case StepType::butterflyGeneric:
 					fftStepGeneric<inverse>(A, B, step);
+					break;
 				}
+
 				A = B;
 				swap(B, other);
 			}
 
 			// Un-permute the result
+			if (_size < 65536)
 			for (size_t i = 0; i < _size; i++) {
 				B[permutation[i]] = A[i];
 			}

@@ -357,7 +357,7 @@
 					plot.insert({
 						width: 600,
 						paddingX: 80,
-						x: {scale: 'log', min: 1, major: 1, label: 'size', tick: [1, 4, 16, 64, 256, 1024, 4096, 16384, 65536], pad: true},
+						x: {scale: 'log', min: 1, major: 1, label: 'size', tick: [1, 4, 16, 64, 256, 1024, 4096, 16384, 65536, {string: "2^18", value: 1<<18}, {string: "2^20", value: 1<<20}, {string: "2^22", value: 1<<22}, {string: "2^24", value: 1<<24}], pad: true},
 						y: {major: 0, min: 0, pad: true, tick: [0], label: 'normalised rate'}
 					});
 				</script>

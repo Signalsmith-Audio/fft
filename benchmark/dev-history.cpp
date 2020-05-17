@@ -34,17 +34,17 @@ Benchmark<DevHistory<dev_direct::FFT, directName, directTag>, 256> benchDirect;
 
 #include "dev-history/unspecialised-factors.h"
 char unspecialisedName[] = "Unspecialised", unspecialisedTag[] = "dev-history-unspecialised";
-Benchmark<DevHistory<dev_unspecialised_factors::FFT, unspecialisedName, unspecialisedTag>, (1<<18)> benchUnspecialised;
+Benchmark<DevHistory<dev_unspecialised_factors::FFT, unspecialisedName, unspecialisedTag>, (1<<16)> benchUnspecialised;
 
 #include "dev-history/specialised-23.h"
 char specialised23Name[] = "Radix-2/3", specialised23Tag[] = "dev-history-specialised23";
-Benchmark<DevHistory<dev_specialised23::FFT, specialised23Name, specialised23Tag>, (1<<18)> benchSpecialised23;
+Benchmark<DevHistory<dev_specialised23::FFT, specialised23Name, specialised23Tag>, (1<<16)> benchSpecialised23;
 
 #include "dev-history/specialised-235.h"
 char specialised235Name[] = "Radix-2/3/5", specialised235Tag[] = "dev-history-specialised235";
-Benchmark<DevHistory<dev_specialised235::FFT, specialised235Name, specialised235Tag>, (1<<18)> benchSpecialised235;
+Benchmark<DevHistory<dev_specialised235::FFT, specialised235Name, specialised235Tag>, (1<<20)> benchSpecialised235;
 
 #include "dev-history/memory-ping-pong.h"
 char pingpongName[] = "Ping-pong", pingpongTag[] = "dev-history-ping-pong";
-Benchmark<DevHistory<dev_memory_pingpong::FFT, pingpongName, pingpongTag>, (1<<18)> benchPingPong;
+Benchmark<DevHistory<dev_memory_pingpong::FFT, pingpongName, pingpongTag>, (1<<20)> benchPingPong;
 
