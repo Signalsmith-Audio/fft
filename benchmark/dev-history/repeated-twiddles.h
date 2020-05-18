@@ -7,7 +7,7 @@
 #define SIGNALSMITH_INLINE __attribute__((always_inline)) inline
 #endif
 
-namespace signalsmith {
+namespace dev_repeated_twiddles {
 
 	namespace perf {
 		// Complex multiplication has edge-cases around Inf/NaN - handling those properly makes std::complex non-inlineable, so we use our own
@@ -41,8 +41,7 @@ namespace signalsmith {
 		std::vector<complex> working;
 
 		enum class StepType {
-			butterfly2, butterfly3, butterfly4, butterfly5, butterflyGeneric,
-			permuteForwards
+			butterfly2, butterfly3, butterfly4, butterfly5, butterflyGeneric
 		};
 		
 		struct Step {
@@ -103,7 +102,6 @@ namespace signalsmith {
 					}
 				}
 			}
-			plan.push_back({StepType::permuteForwards, 0, 0, 0});
 		}
 
 		template<bool inverse>
@@ -215,7 +213,7 @@ namespace signalsmith {
 					complex imagSum1 = (B - E)*factor5a.imag() + (C - D)*factor5b.imag();
 					complex realSum2 = A + (B + E)*factor5b.real() + (C + D)*factor5a.real();
 					complex imagSum2 = (B - E)*factor5b.imag() + (D - C)*factor5a.imag();
-
+ 
 					output[0] = A + B + C + D + E;
 					output[1] = perf::complexMul<inverse>(perf::complexAddI<false>(realSum1, imagSum1), twiddles[1]);
 					output[2] = perf::complexMul<inverse>(perf::complexAddI<false>(realSum2, imagSum2), twiddles[2]);
@@ -235,8 +233,8 @@ namespace signalsmith {
 			const complex *A = input;
 			// Choose the starting state for the ping-pong pattern, so the result ends up in the output
 			bool oddSteps = (plan.size()%2);
-			complex *B = oddSteps ? output : working.data();
-			complex *other = oddSteps ? working.data() : output;
+			complex *B = oddSteps ? working.data() : output;
+			complex *other = oddSteps ? output : working.data();
 	
 			// Go through the steps
 			for (const Step& step : plan) {
@@ -256,15 +254,15 @@ namespace signalsmith {
 				case StepType::butterflyGeneric:
 					fftStepGeneric<inverse>(A, B, step);
 					break;
-				case StepType::permuteForwards:
-					for (size_t i = 0; i < _size; i++) {
-						B[permutation[i]] = A[i];
-					}
-					break;
 				}
 
 				A = B;
 				swap(B, other);
+			}
+
+			// Permutation
+			for (size_t i = 0; i < _size; i++) {
+				B[permutation[i]] = A[i];
 			}
 		}
 

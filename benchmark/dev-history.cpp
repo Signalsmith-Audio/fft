@@ -48,3 +48,7 @@ Benchmark<DevHistory<dev_specialised235::FFT, specialised235Name, specialised235
 char pingpongName[] = "Ping-pong", pingpongTag[] = "dev-history-ping-pong";
 Benchmark<DevHistory<dev_memory_pingpong::FFT, pingpongName, pingpongTag>, (1<<20)> benchPingPong;
 
+#include "dev-history/repeated-twiddles.h"
+char repeatedTwiddlesName[] = "Repeated twiddles", repeatedTwiddlesTag[] = "dev-history-repeated-twiddles";
+Benchmark<DevHistory<dev_repeated_twiddles::FFT, repeatedTwiddlesName, repeatedTwiddlesTag>, (1<<20)> benchRepeatedTwiddles;
+

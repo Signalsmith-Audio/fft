@@ -41,8 +41,7 @@ namespace signalsmith {
 		std::vector<complex> working;
 
 		enum class StepType {
-			butterfly2, butterfly3, butterfly4, butterfly5, butterflyGeneric,
-			permuteForwards
+			butterfly2, butterfly3, butterfly4, butterfly5, butterflyGeneric
 		};
 		
 		struct Step {
@@ -103,7 +102,6 @@ namespace signalsmith {
 					}
 				}
 			}
-			plan.push_back({StepType::permuteForwards, 0, 0, 0});
 		}
 
 		template<bool inverse>
@@ -235,8 +233,8 @@ namespace signalsmith {
 			const complex *A = input;
 			// Choose the starting state for the ping-pong pattern, so the result ends up in the output
 			bool oddSteps = (plan.size()%2);
-			complex *B = oddSteps ? output : working.data();
-			complex *other = oddSteps ? working.data() : output;
+			complex *B = oddSteps ? working.data() : output;
+			complex *other = oddSteps ? output : working.data();
 	
 			// Go through the steps
 			for (const Step& step : plan) {
@@ -256,15 +254,15 @@ namespace signalsmith {
 				case StepType::butterflyGeneric:
 					fftStepGeneric<inverse>(A, B, step);
 					break;
-				case StepType::permuteForwards:
-					for (size_t i = 0; i < _size; i++) {
-						B[permutation[i]] = A[i];
-					}
-					break;
 				}
 
 				A = B;
 				swap(B, other);
+			}
+
+			// Permutation
+			for (size_t i = 0; i < _size; i++) {
+				B[permutation[i]] = A[i];
 			}
 		}
 
