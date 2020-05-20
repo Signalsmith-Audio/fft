@@ -10,7 +10,7 @@ struct Benchmark {
 		std::vector<int> possibleSizes(0);
 		int size = 1;
 		int maxSize = std::min(constMaxSize, (1<<24));
-		maxSize = std::min(constMaxSize, (1<<16));
+		// maxSize = std::min(constMaxSize, (1<<16));
 		while (size <= maxSize) {
 			possibleSizes.push_back(size);
 			size *= 2;
@@ -24,6 +24,7 @@ struct Benchmark {
 
 			std::vector<int> mults = {3, 5, 7, 9, 11, 15, 23};
 			mults = {3, 5, 9, 15, 25};
+			mults = {3, 9};
 			// mults = {3,5,7,9,11,13,15,17,19,21,23,25,27,29};
 			for (int mult : mults) {
 				if (size*mult < maxSize) {
