@@ -2,6 +2,7 @@
 #include <complex>
 #include <cmath>
 #include <array>
+#include <memory>
 
 #ifndef SIGNALSMITH_INLINE
 #ifdef __GNUC__
@@ -290,8 +291,42 @@ namespace signalsmith {
 			}
 		}
 
+		static bool validSize(size_t size) {
+			constexpr static bool filter[32] = {
+				1, 1, 1, 1, 1, 1, 1, 0, 1, 1, // 0-9
+				1, 0, 1, 0, 0, 1, 1, 0, 1, 0, // 10-19
+				1, 0, 0, 0, 1, 1, 0, 0/*27*/, 0, 0, // 20-29
+				1, 0
+			};
+			return filter[size];
+		}
 	public:
-		FFT(size_t size) : _size(0) {
+		static size_t fastSizeAbove(size_t size) {
+			size_t power2 = 1;
+			while (size >= 32) {
+				size = (size - 1)/2 + 1;
+				power2 *= 2;
+			}
+			while (size < 32 && !validSize(size)) {
+				++size;
+			}
+			return power2*size;
+		}
+		static size_t fastSizeBelow(size_t size) {
+			size_t power2 = 1;
+			while (size >= 32) {
+				size /= 2;
+				power2 *= 2;
+			}
+			while (size > 1 && !validSize(size)) {
+				--size;
+			}
+			return power2*size;
+		}
+
+		FFT(size_t size, int fastDirection=0) : _size(0) {
+			if (fastDirection > 0) size = fastSizeAbove(size);
+			if (fastDirection < 0) size = fastSizeBelow(size);
 			this->setSize(size);
 		}
 
@@ -303,6 +338,12 @@ namespace signalsmith {
 				setPlan();
 			}
 			return _size;
+		}
+		size_t setSizeMinimum(size_t size) {
+			return setSize(fastSizeAbove(size));
+		}
+		size_t setSizeMaximum(size_t size) {
+			return setSize(fastSizeBelow(size));
 		}
 		const size_t & size() const {
 			return size;

@@ -131,3 +131,45 @@ TEST("Inverse", inverse) {
 		}
 	}
 }
+
+struct Powers {
+	size_t two = 0, three = 0, five = 0, remainder = 1;
+};
+Powers factorise(size_t size) {
+	Powers powers;
+	while (size%2 == 0) {
+		size /= 2;
+		powers.two++;
+	}
+	while (size%3 == 0) {
+		size /= 3;
+		powers.three++;
+	}
+	while (size%5 == 0) {
+		size /= 5;
+		powers.five++;
+	}
+	powers.remainder = size;
+	return powers;
+}
+
+TEST("Sizes", sizes) {
+	using signalsmith::FFT;
+
+	for (size_t i = 1; i < 1000; ++i) {
+		size_t above = FFT<double>::fastSizeAbove(i);
+		size_t below = FFT<double>::fastSizeBelow(i);
+
+		if (above < i) return test.fail("above < i");
+		if (below > i) return test.fail("below > i");
+
+		auto factorsAbove = factorise(above);
+		auto factorsBelow = factorise(below);
+
+		if (factorsAbove.remainder != 1) return test.fail("non-fast above remainder");
+		if (factorsBelow.remainder != 1) return test.fail("non-fast below remainder");
+
+		if (factorsAbove.three + factorsAbove.five > 2) return test.fail("above is too complex");
+		if (factorsBelow.three + factorsBelow.five > 2) return test.fail("below is too complex");
+	}
+}
