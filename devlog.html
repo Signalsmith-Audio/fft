@@ -288,7 +288,6 @@
 				<p>This uses about 5% fewer operations than ordinary split-radix (<equation>\frac{34}{9} N log_2(N)</equation> instead of <equation>4 N log_2(N)</equation>), however it makes the permutation of the results slightly more complicated, in a way which isn't helpful for us.</p>
 				<p>We're going to stick to ordinary split-radix.</p>
 			</details></aside>
-			<hr>
 
 			<h3>Execution order</h3>
 			<p>The diagrams here show the order of operations for the <em>data flow</em>, but it says nothing about the order things are actually calculated.  A radix-4-style implementation will calculate two radix-2 steps at a time - but that execution order is not inherently tied to the arrangement of twiddle-factors.</p>
@@ -346,6 +345,7 @@
 			<script src="out/results/dev-history-ping-pong.js"></script>
 			<script src="out/results/dev-history-repeated-twiddles.js"></script>
 			<script src="out/results/previous.js"></script>
+			<script src="out/results/previous-permute.js"></script>
 			<figure>
 				<script>
 					var plot = new Plot();
@@ -353,7 +353,9 @@
 						data.sort((a, b) => a.size - b.size);
 						plot.line(data.map(x => x.size), data.map(y => y.rate)).label(label);
 					}
-					["Signalsmith", "Direct", "Unspecialised", "Radix-2/3", "Radix-2/3/5", "Ping-pong", "Repeated twiddles", "KissFFT", "Previous"].forEach(key => {
+					var lines = ["Signalsmith", "Direct", "Unspecialised", "Radix-2/3", "Radix-2/3/5", "Ping-pong", "Repeated twiddles", "KissFFT", "Previous", "Previous permute"];
+					lines = ["Signalsmith", "KissFFT", "Previous", "Previous permute"]
+					lines.forEach(key => {
 						if (benchmarks[key]) addLine(key, benchmarks[key]);
 					});
 					plot.insert({

@@ -7,13 +7,14 @@
 using signalsmith::fft::FFT;
 using signalsmith::fft::getFft;
 
+template <bool permute>
 struct SignalsmithPrevious {
 
 	static std::string name() {
-		return "Previous";
+		return std::string("Previous") + (permute ? " permute" : "");
 	}
 	static std::string resultTag() {
-		return "previous";
+		return std::string("previous")+ (permute ? "-permute" : "");
 	}
 	static std::string version() {
 		return "1";
@@ -33,10 +34,11 @@ struct SignalsmithPrevious {
 
 		void forward(std::complex<T> *input, std::complex<T> *output) {
 			fft->fft((double*)input, (double*)output);
-			fft->permute((double*)output);
+			if (permute) fft->permute((double*)output);
 		}
 	};
 
 	using DoubleOutOfPlace = OutOfPlace<double>;
 };
-Benchmark<SignalsmithPrevious> benchPrevious;
+Benchmark<SignalsmithPrevious<true>> bench1;
+Benchmark<SignalsmithPrevious<false>> bench2;

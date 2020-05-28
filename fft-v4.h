@@ -4,7 +4,13 @@
 #include <array>
 
 #ifndef SIGNALSMITH_INLINE
+#ifdef __GNUC__
 #define SIGNALSMITH_INLINE __attribute__((always_inline)) inline
+#elif defined(__MSVC__)
+#define SIGNALSMITH_INLINE __forceinline inline
+#else
+#define SIGNALSMITH_INLINE inline
+#endif
 #endif
 
 namespace signalsmith {
@@ -52,7 +58,9 @@ namespace signalsmith {
 		};
 		std::vector<Step> plan;
 		std::vector<complex> twiddles;
-		std::vector<int> permutation;
+		struct PermutionPair {size_t from, to;};
+		std::vector<PermutionPair> permutationSequence;
+
 		void setPlan() {
 			plan.resize(0);
 			twiddles.resize(0);
@@ -89,16 +97,33 @@ namespace signalsmith {
 				size /= stepSize;
 			}
 
-			// Construct permutation from factorised sizes
-			permutation.resize(1);
-			permutation[0] = 0;
-			for (int i = plan.size() - 1; i >= 0; --i) {
-				const Step &step = plan[i];
-				size_t pSize = permutation.size();
-				size_t stride = _size/pSize/step.N;
-				for (size_t i = 1; i < step.N; i++) {
-					for (size_t j = 0; j < pSize; j++) {
-						permutation.push_back(permutation[j] + i*stride);
+			// Construct optimal cache-invariant permutation order
+			permutationSequence.resize(1);
+			permutationSequence[0] = {0, 0};
+			size_t lowProduct = 1, highDivisor = 1;
+			size_t lowIndex = 0, highIndex = plan.size();
+			while (lowProduct*highDivisor != _size) {
+				size_t factor = 0, fromStep = 0;
+				if (lowProduct <= highDivisor) {
+					factor = plan[lowIndex].N;
+					++lowIndex;
+					lowProduct *= factor;
+					fromStep = lowProduct/factor;
+				} else {
+					--highIndex;
+					factor = plan[highIndex].N;
+					highDivisor *= factor;
+					fromStep = _size/highDivisor;
+				}
+				const size_t toStep = _size/fromStep/factor;
+				const size_t oldSize = permutationSequence.size();
+				for (size_t i = 1; i < factor; ++i) {
+					for (size_t j = 0; j < oldSize; ++j) {
+						auto pair = permutationSequence[j];
+						permutationSequence.push_back({
+							pair.from + i*fromStep,
+							pair.to + i*toStep
+						});
 					}
 				}
 			}
@@ -260,9 +285,8 @@ namespace signalsmith {
 				swap(B, other);
 			}
 
-			// Permutation
-			for (size_t i = 0; i < _size; i++) {
-				B[permutation[i]] = A[i];
+			for (auto &pair : permutationSequence) {
+				B[pair.from] = A[pair.to];
 			}
 		}
 
