@@ -330,6 +330,7 @@
 			<p>This is commonly used to produce in-order outputs, to avoid a separate permutation step.  However, we're going to use it for something different: avoiding branches and twiddle-loading!</p>
 
 			<h2 id="comparison">Benchmarks</h2>
+			<!--
 			<script>
 				let benchmarks = {};
 				function addResults(info, rates) {
@@ -365,6 +366,19 @@
 						y: {major: 0, min: 0, pad: true, tick: [0], label: 'normalised rate'}
 					});
 				</script>
+			</figure>
+			-->
+			<figure>
+				<img src="out/comparison.svg">
+				<figcaption>Comparison with other implementations</figcaption>
+			</figure>
+			<figure>
+				<img src="out/previous.svg">
+				<figcaption>Comparison with previous implementation, for which permuation was optional</figcaption>
+			</figure>
+			<figure>
+				<img src="out/history.svg">
+				<figcaption>Development history</figcaption>
 			</figure>
 
 			<footer class="citations"></footer>
