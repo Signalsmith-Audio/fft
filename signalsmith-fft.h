@@ -53,24 +53,122 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		using complex = std::complex<V>;
 		size_t _size;
 		
-		struct Step {
-			size_t factor;
+		enum class StepType {
+			permute, generic
 		};
+		struct Step {
+			StepType type;
+			size_t factor;
+			size_t startIndex;
+			size_t innerRepeats;
+			size_t twiddleIndex;
+		};
+		std::vector<size_t> factors;
+		std::vector<Step> plan;
+		std::vector<complex> twiddleVector;
+		
+		struct PermutationPair {size_t from, to;};
+		std::vector<PermutationPair> permutation;
+		
+		void addPlanSteps(size_t factorIndex, size_t start, size_t length) {
+			if (factorIndex >= factors.size()) return;
+			
+			size_t factor = factors[factorIndex], subLength = length/factor;;
+			Step mainStep{StepType::generic, factor, start, subLength, twiddleVector.size()};
+			for (size_t i = 0; i < subLength; ++i) {
+				for (size_t f = 0; f < factor; ++f) {
+					V phase = 2*M_PI*i*f/length;
+					complex twiddle = {cos(phase), -sin(phase)};
+					twiddleVector.push_back(twiddle);
+				}
+			}
+			
+			plan.push_back(mainStep);
+			for (size_t i = 0; i < factor; ++i) {
+				addPlanSteps(factorIndex + 1, start + i*subLength, subLength);
+			}
+		}
+		void setPlan() {
+			factors.resize(0);
+			size_t size = _size, f = 2;
+			while (size > 1) {
+				if (size%f == 0) {
+					factors.push_back(f);
+					size /= f;
+				} else if (f > sqrt(size)) {
+					f = size;
+				} else {
+					++f;
+				}
+			}
+
+			plan.resize(0);
+			twiddleVector.resize(0);
+			addPlanSteps(0, 0, _size);
+			
+			permutation.resize(0);
+			permutation.push_back(PermutationPair{0, 0});
+			size_t inputStep = _size, outputStep = 1;
+			for (size_t f : factors) {
+				inputStep /= f;
+				size_t oldSize = permutation.size();
+				for (size_t i = 1; i < f; ++i) {
+					for (size_t j = 0; j < oldSize; ++j) {
+						PermutationPair pair = permutation[j];
+						pair.from += i*inputStep;
+						pair.to += i*outputStep;
+						permutation.push_back(pair);
+					}
+				}
+				outputStep *= f;
+			}
+			
+			Step step;
+			step.type = StepType::permute;
+			plan.push_back(step);
+		}
 
 		template<bool inverse>
 		void fftStepGeneric(complex *data, const Step &step) {
+			std::vector<complex> workingVector(step.factor*step.innerRepeats);
+			complex *working = workingVector.data();
+			for (size_t i = 0; i < workingVector.size(); ++i) {
+				working[i] = data[i];
+			}
+
+			const complex *twiddles = twiddleVector.data() + step.twiddleIndex;
+			const size_t factor = step.factor;
+			const size_t stride = step.innerRepeats;
+			for (size_t repeat = 0; repeat < step.innerRepeats; ++repeat) {
+				for (size_t f = 0; f < factor; ++f) {
+					complex sum = working[0];
+					for (size_t i = 1; i < factor; ++i) {
+						V phase = 2*M_PI*f*i/factor;
+						complex factor = {cos(phase), -sin(phase)};
+						complex value = inverse ? perf::complexMul<true>(working[i*stride], twiddles[i]) : working[i*stride];
+						sum += perf::complexMul<inverse>(value, factor);
+					}
+					data[f*stride] = inverse ? sum : perf::complexMul<false>(sum, twiddles[f]);
+				}
+				++data;
+				++working;
+				twiddles += factor;
+			}
+		}
+
+		template<bool inverse>
+		void permute(complex *data) {
 			std::vector<complex> working(_size);
 			for (size_t i = 0; i < _size; ++i) {
 				working[i] = data[i];
 			}
-			for (size_t f = 0; f < _size; ++f) {
-				complex sum = working[0];
-				for (size_t i = 1; i < _size; ++i) {
-					V phase = 2*M_PI*f*i/_size;
-					complex factor = {cos(phase), -sin(phase)};
-					sum += perf::complexMul<inverse>(working[i], factor);
+
+			for (auto pair : permutation) {
+				if (inverse) {
+					data[pair.from] = working[pair.to];
+				} else {
+					data[pair.to] = working[pair.from];
 				}
-				data[f] = sum;
 			}
 		}
 
@@ -78,9 +176,30 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		void run(complex *data) {
 			using std::swap;
 			
-			Step singleStep;
-			singleStep.factor = _size;
-			fftStepGeneric<inverse>(data, singleStep);
+//			std::cout << "start: ";
+//			for (size_t i = 0; i < _size; ++i) {
+//				std::cout << " " << data[i];
+//			}
+//			std::cout << std::endl;
+			
+			Step *step = inverse ? plan.data() + plan.size() - 1 : plan.data();
+			Step *end = inverse ? plan.data() - 1 : plan.data() + plan.size();
+			for (; step != end; inverse ? --step : ++step) {
+				switch (step->type) {
+					case StepType::permute:
+						permute<inverse>(data);
+						break;
+					case StepType::generic:
+						fftStepGeneric<inverse>(data + step->startIndex, *step);
+						break;
+				}
+
+//				std::cout << "\t";
+//				for (size_t i = 0; i < _size; ++i) {
+//					std::cout << " " << data[i];
+//				}
+//				std::cout << std::endl;;
+			}
 		}
 
 		static bool validSize(size_t size) {
@@ -125,9 +244,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		size_t setSize(size_t size) {
 			if (size != _size) {
 				_size = size;
-//				working.resize(size);
-
-//				setPlan();
+				setPlan();
 			}
 			return _size;
 		}

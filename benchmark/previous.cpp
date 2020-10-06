@@ -21,10 +21,10 @@ struct SignalsmithPrevious {
 	}
 
 	template <typename T>
-	struct OutOfPlace {
+	struct OutOfPlace : OutOfPlaceRunner<T> {
 		std::shared_ptr<FFT<double>> fft;
 
-		OutOfPlace(size_t targetSize) : fft(getFft<double>(targetSize)) {
+		OutOfPlace(size_t targetSize) : OutOfPlaceRunner<T>(targetSize), fft(getFft<double>(targetSize)) {
 			size_t size = targetSize;
 			while (fft->size() > targetSize) {
 				--size;

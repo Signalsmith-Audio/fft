@@ -6,6 +6,7 @@
 #include "tests-common.h"
 
 std::vector<int> testSizes() {
+	return {1, 2, 4, 6};
 	return {
 		1, 2, 4, 8, 16, 32, 64, 128, 256,
 		3, 6, 9, 12, 18, 24,
@@ -98,7 +99,8 @@ TEST("Linearity", test_2N_linearity) {
 	}
 }
 
-TEST("Inverse", inverse) {
+template<int fixedHarmonics=-1>
+void inverseTest(Test test) {
 	using signalsmith::FFT;
 
 	std::vector<int> sizes = testSizes();
@@ -110,10 +112,13 @@ TEST("Inverse", inverse) {
 		std::vector<std::complex<double>> expected(size);
 
 		for (int i = 0; i < size; i++) {
-			input[i] = randomComplex<double>();
-			double freq = 1;
-			double phase = 2*M_PI*i*freq/size;
-			input[i] = {cos(phase), sin(phase)};
+			if (fixedHarmonics >= 0) {
+				double freq = fixedHarmonics;
+				double phase = 2*M_PI*i*freq/size;
+				input[i] = {cos(phase), sin(phase)};
+			} else {
+				input[i] = randomComplex<double>();
+			}
 			expected[i] = input[i]*(double)size;
 		}
 
@@ -130,6 +135,14 @@ TEST("Inverse", inverse) {
 			return test.fail("inverse did not match");
 		}
 	}
+}
+
+TEST("Inverse (first harmonic)", inverse_f1) {
+	return inverseTest<1>(test);
+}
+
+TEST("Inverse (random)", inverse_random) {
+	return inverseTest<-1>(test);
 }
 
 struct Powers {
