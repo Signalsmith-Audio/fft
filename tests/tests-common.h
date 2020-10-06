@@ -4,7 +4,7 @@
 // from the shared library
 #include <test/tests.h>
 
-#include "../fft-v4.h"
+#include "../signalsmith-fft.h"
 
 template<typename T>
 std::complex<T> randomComplex() {

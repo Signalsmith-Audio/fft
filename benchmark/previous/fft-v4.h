@@ -14,7 +14,7 @@
 #endif
 #endif
 
-namespace signalsmith {
+namespace signalsmith_v4 {
 
 	namespace perf {
 		// Complex multiplication has edge-cases around Inf/NaN - handling those properly makes std::complex non-inlineable, so we use our own
@@ -41,11 +41,19 @@ namespace signalsmith {
 		}
 	}
 
+	template<typename V, size_t size>
+	class FixedFFT {
+		
+	};
+
 	template<typename V>
 	class FFT {
 		using complex = std::complex<V>;
 		size_t _size;
 		std::vector<complex> working;
+
+		size_t finalFixedSize;
+		size_t finalFixedPingPong = 0;
 
 		enum class StepType {
 			butterfly2, butterfly3, butterfly4, butterfly5, butterflyGeneric
@@ -65,7 +73,8 @@ namespace signalsmith {
 		void setPlan() {
 			plan.resize(0);
 			twiddles.resize(0);
-			size_t size = _size;
+			size_t size = _size/finalFixedSize;
+
 			while (size > 1) {
 				size_t stepSize = size;
 				if (size%4 == 0) {
@@ -333,6 +342,7 @@ namespace signalsmith {
 		size_t setSize(size_t size) {
 			if (size != _size) {
 				_size = size;
+				finalFixedSize = 1;
 				working.resize(size);
 
 				setPlan();

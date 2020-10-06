@@ -34,6 +34,7 @@ article.save("out/comparison", figure)
 
 figure, axis = article.wide()
 plot_if_exists(axis, "out/results/signalsmith.csv")
+plot_if_exists(axis, "out/results/previous-v4.csv")
 plot_if_exists(axis, "out/results/previous-permute.csv")
 plot_if_exists(axis, "out/results/previous.csv")
 article.save("out/previous", figure)
