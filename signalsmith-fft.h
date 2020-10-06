@@ -52,6 +52,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 	class FFT {
 		using complex = std::complex<V>;
 		size_t _size;
+		std::vector<complex> workingVector;
 		
 		enum class StepType {
 			permute, generic
@@ -73,7 +74,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		void addPlanSteps(size_t factorIndex, size_t start, size_t length) {
 			if (factorIndex >= factors.size()) return;
 			
-			size_t factor = factors[factorIndex], subLength = length/factor;;
+			size_t factor = factors[factorIndex], subLength = length/factor;
 			Step mainStep{StepType::generic, factor, start, subLength, twiddleVector.size()};
 			for (size_t i = 0; i < subLength; ++i) {
 				for (size_t f = 0; f < factor; ++f) {
@@ -130,9 +131,8 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 
 		template<bool inverse>
 		void fftStepGeneric(complex *data, const Step &step) {
-			std::vector<complex> workingVector(step.factor*step.innerRepeats);
 			complex *working = workingVector.data();
-			for (size_t i = 0; i < workingVector.size(); ++i) {
+			for (size_t i = 0; i < step.factor*step.innerRepeats; ++i) {
 				working[i] = data[i];
 			}
 
@@ -158,7 +158,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 
 		template<bool inverse>
 		void permute(complex *data) {
-			std::vector<complex> working(_size);
+			complex *working = workingVector.data();
 			for (size_t i = 0; i < _size; ++i) {
 				working[i] = data[i];
 			}
@@ -198,7 +198,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 //				for (size_t i = 0; i < _size; ++i) {
 //					std::cout << " " << data[i];
 //				}
-//				std::cout << std::endl;;
+//				std::cout << std::endl;
 			}
 		}
 
@@ -244,6 +244,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		size_t setSize(size_t size) {
 			if (size != _size) {
 				_size = size;
+				workingVector.resize(size);
 				setPlan();
 			}
 			return _size;
