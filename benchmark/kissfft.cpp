@@ -16,10 +16,10 @@ struct Kiss {
 	}
 
 	template <typename T>
-	struct OutOfPlace {
+	struct OutOfPlace : public OutOfPlaceRunner<T> {
 		kissfft<T> fftForward;
 
-		OutOfPlace(size_t size) : fftForward(size, false) {}
+		OutOfPlace(size_t size) : OutOfPlaceRunner<T>(size), fftForward(size, false) {}
 
 		void forward(std::complex<T> *input, std::complex<T> *output) {
 			fftForward.transform(input, output);
