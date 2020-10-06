@@ -11,7 +11,7 @@ class OutOfPlaceRunner {
 public:
 	size_t size;
 
-	OutOfPlaceRunner(size_t size) {}
+	OutOfPlaceRunner(size_t size) : size(size) {}
 	virtual ~OutOfPlaceRunner() {}
 	
 	virtual void getPointers(std::complex<T> **inPointer, std::complex<T> **outPointer) {

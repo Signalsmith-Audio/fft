@@ -14,9 +14,9 @@ struct Signalsmith {
 	}
 
 	template <typename T>
-	struct OutOfPlace {
+	struct OutOfPlace : public OutOfPlaceRunner<T> {
 		signalsmith::FFT<T> fft;
-		OutOfPlace(size_t size) : fft(size) {}
+		OutOfPlace(size_t size) : OutOfPlaceRunner<T>(size), fft(size) {}
 
 		void forward(std::complex<T> *input, std::complex<T> *output) {
 			fft.fft(input, output);

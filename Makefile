@@ -29,7 +29,7 @@ out/test: *.h $(shell find tests -iname "*.h") $(shell find tests -iname "*.cpp"
 graphs:
 	python benchmark/graphs.py
 
-benchmark: test benchmark-main benchmark-kissfft benchmark-previous benchmark-dev-history
+benchmark: test benchmark-main benchmark-previous benchmark-dev-history benchmark-kissfft benchmark-fftw
 
 BENCHMARK_TEST_TIME := 0.05
 
@@ -48,7 +48,7 @@ out/benchmark-%: *.h $(shell find benchmark -iname "*.h") $(shell find benchmark
 
 out/benchmark-fftw: $(shell find benchmark -iname "*.h") $(shell find benchmark -iname "*.cpp")
 	mkdir -p out
-	g++ -std=c++11 -msse2 -mavx -Wfatal-errors -O3 \
+	g++ -std=c++11 -msse2 -mavx -Wfatal-errors -g -O3 \
 		"${SHARED_PATH}/test/main.cpp" -I "${SHARED_PATH}" \
 		-I benchmark/ benchmark/fftw.cpp \
 		-lfftw3 \
