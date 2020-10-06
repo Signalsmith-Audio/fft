@@ -62,6 +62,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			size_t factor;
 			size_t startIndex;
 			size_t innerRepeats;
+			size_t outerRepeats;
 			size_t twiddleIndex;
 		};
 		std::vector<size_t> factors;
@@ -71,11 +72,11 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		struct PermutationPair {size_t from, to;};
 		std::vector<PermutationPair> permutation;
 		
-		void addPlanSteps(size_t factorIndex, size_t start, size_t length) {
+		void addPlanSteps(size_t factorIndex, size_t start, size_t length, size_t repeats) {
 			if (factorIndex >= factors.size()) return;
 			
 			size_t factor = factors[factorIndex], subLength = length/factor;
-			Step mainStep{StepType::generic, factor, start, subLength, twiddleVector.size()};
+			Step mainStep{StepType::generic, factor, start, subLength, repeats, twiddleVector.size()};
 			for (size_t i = 0; i < subLength; ++i) {
 				for (size_t f = 0; f < factor; ++f) {
 					V phase = 2*M_PI*i*f/length;
@@ -85,9 +86,10 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			}
 			
 			plan.push_back(mainStep);
-			for (size_t i = 0; i < factor; ++i) {
-				addPlanSteps(factorIndex + 1, start + i*subLength, subLength);
-			}
+//			for (size_t i = 0; i < factor; ++i) {
+//				addPlanSteps(factorIndex + 1, start + i*subLength, subLength);
+//			}
+			addPlanSteps(factorIndex + 1, start, subLength, repeats*factor);
 		}
 		void setPlan() {
 			factors.resize(0);
@@ -105,7 +107,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 
 			plan.resize(0);
 			twiddleVector.resize(0);
-			addPlanSteps(0, 0, _size);
+			addPlanSteps(0, 0, _size, 1);
 			
 			permutation.resize(0);
 			permutation.push_back(PermutationPair{0, 0});
@@ -130,32 +132,36 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		}
 
 		template<bool inverse>
-		void fftStepGeneric(complex *data, const Step &step) {
+		void fftStepGeneric(complex *origData, const Step &step) {
 			complex *working = workingVector.data();
-			for (size_t i = 0; i < step.factor*step.innerRepeats; ++i) {
-				working[i] = data[i];
-			}
 
-			const complex *twiddles = twiddleVector.data() + step.twiddleIndex;
-			const size_t factor = step.factor;
-			const size_t stride = step.innerRepeats;
-			for (size_t repeat = 0; repeat < step.innerRepeats; ++repeat) {
-				for (size_t f = 0; f < factor; ++f) {
-					complex sum = working[0];
-					for (size_t i = 1; i < factor; ++i) {
-						V phase = 2*M_PI*f*i/factor;
-						complex factor = {cos(phase), -sin(phase)};
-						complex value = inverse ? perf::complexMul<true>(working[i*stride], twiddles[i]) : working[i*stride];
-						sum += perf::complexMul<inverse>(value, factor);
+			for (size_t outerRepeat = 0; outerRepeat < step.outerRepeats; ++outerRepeat) {
+				complex *data = origData;
+				
+				const complex *twiddles = twiddleVector.data() + step.twiddleIndex;
+				const size_t factor = step.factor;
+				const size_t stride = step.innerRepeats;
+				for (size_t repeat = 0; repeat < step.innerRepeats; ++repeat) {
+					for (size_t i = 0; i < step.factor; ++i) {
+						working[i] = data[i*stride];
 					}
-					data[f*stride] = inverse ? sum : perf::complexMul<false>(sum, twiddles[f]);
+					for (size_t f = 0; f < factor; ++f) {
+						complex sum = working[0];
+						for (size_t i = 1; i < factor; ++i) {
+							V phase = 2*M_PI*f*i/factor;
+							complex factor = {cos(phase), -sin(phase)};
+							complex value = inverse ? perf::complexMul<true>(working[i], twiddles[i]) : working[i];
+							sum += perf::complexMul<inverse>(value, factor);
+						}
+						data[f*stride] = inverse ? sum : perf::complexMul<false>(sum, twiddles[f]);
+					}
+					++data;
+					twiddles += factor;
 				}
-				++data;
-				++working;
-				twiddles += factor;
+				origData += step.factor*step.innerRepeats;
 			}
 		}
-
+		
 		template<bool inverse>
 		void permute(complex *data) {
 			complex *working = workingVector.data();

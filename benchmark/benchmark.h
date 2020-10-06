@@ -24,7 +24,7 @@ public:
 
 template<typename Implementation, int constMaxSize=INT_MAX>
 struct Benchmark {
-	static std::vector<int> getSizes(int customMaxSize=16384) { // 16777216
+	static std::vector<int> getSizes(int customMaxSize=65536*8) { // 16777216
 		std::vector<int> possibleSizes(0);
 		int size = 1;
 		int maxSize = std::min(constMaxSize, customMaxSize);
