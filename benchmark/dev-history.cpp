@@ -34,3 +34,10 @@ struct DevHistory {
 #include "dev-history/direct.h"
 char directName[] = "Direct", directTag[] = "dev-history-direct";
 Benchmark<DevHistory<signalsmith_direct::FFT, directName, directTag>, 256> benchDirect;
+
+#undef SIGNALSMITH_FFT_V5
+#undef SIGNALSMITH_FFT_NAMESPACE
+#define SIGNALSMITH_FFT_NAMESPACE signalsmith_factorise
+#include "dev-history/factorise.h"
+char factoriseName[] = "Factorise", factoriseTag[] = "dev-history-factorise";
+Benchmark<DevHistory<signalsmith_factorise::FFT, factoriseName, factoriseTag>, 8192> benchFactorise;

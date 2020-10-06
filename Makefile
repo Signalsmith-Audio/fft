@@ -46,6 +46,8 @@ out/benchmark-%: *.h $(shell find benchmark -iname "*.h") $(shell find benchmark
 		-I benchmark/ benchmark/$*.cpp \
 		-o out/benchmark-$*
 
+# Custom versions which need more config
+
 out/benchmark-fftw: $(shell find benchmark -iname "*.h") $(shell find benchmark -iname "*.cpp")
 	mkdir -p out
 	g++ -std=c++11 -msse2 -mavx -Wfatal-errors -g -O3 \
@@ -53,3 +55,8 @@ out/benchmark-fftw: $(shell find benchmark -iname "*.h") $(shell find benchmark 
 		-I benchmark/ benchmark/fftw.cpp \
 		-lfftw3 \
 		-o out/benchmark-fftw
+		
+############## Development ##############
+
+# After an initial "make benchmark", you can continue
+dev: test benchmark-main graphs
