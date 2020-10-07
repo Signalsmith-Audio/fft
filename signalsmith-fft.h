@@ -55,7 +55,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		std::vector<complex> workingVector;
 		
 		enum class StepType {
-			permute, generic, step2, step3, step4
+			generic, step2, step3
 		};
 		struct Step {
 			StepType type;
@@ -74,42 +74,31 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		
 		void addPlanSteps(size_t factorIndex, size_t start, size_t length, size_t repeats) {
 			if (factorIndex >= factors.size()) return;
-			
+
 			size_t factor = factors[factorIndex], subLength = length/factor;
 			Step mainStep{StepType::generic, factor, start, subLength, repeats, twiddleVector.size()};
 
-			if (factor == 2 && factorIndex + 1 < factors.size() && factors[factorIndex + 1] == 2) {
-				++factorIndex;
-				factor = 4;
-				mainStep.type = StepType::step4;
-				mainStep.innerRepeats = subLength = length/4;
-				for (size_t i = 0; i < subLength; ++i) {
-					V phase = 2*M_PI*i/length;
-					twiddleVector.push_back(1);
-					twiddleVector.push_back(complex{cos(2*phase), -sin(2*phase)});
-					twiddleVector.push_back(complex{cos(1*phase), -sin(1*phase)});
-					twiddleVector.push_back(complex{cos(3*phase), -sin(3*phase)});
-				}
-			} else {
-				if (factor == 2) mainStep.type = StepType::step2;
-				if (factor == 3) mainStep.type = StepType::step3;
-				for (size_t i = 0; i < subLength; ++i) {
-					for (size_t f = 0; f < factor; ++f) {
-						V phase = 2*M_PI*i*f/length;
-						complex twiddle = {cos(phase), -sin(phase)};
-						twiddleVector.push_back(twiddle);
-					}
+			if (factor == 2) mainStep.type = StepType::step2;
+			if (factor == 3) mainStep.type = StepType::step3;
+
+			// Twiddles
+			for (size_t i = 0; i < subLength; ++i) {
+				for (size_t f = 0; f < factor; ++f) {
+					V phase = 2*M_PI*i*f/length;
+					complex twiddle = {cos(phase), -sin(phase)};
+					twiddleVector.push_back(twiddle);
 				}
 			}
 
-			plan.push_back(mainStep);
-			if (false && repeats == 1 && sizeof(complex)*subLength > 65536) {
+//			if (false && repeats == 1 && sizeof(complex)*subLength > 65536) {
+			if (true) {
 				for (size_t i = 0; i < factor; ++i) {
 					addPlanSteps(factorIndex + 1, start + i*subLength, subLength, 1);
 				}
 			} else {
 				addPlanSteps(factorIndex + 1, start, subLength, repeats*factor);
 			}
+			plan.push_back(mainStep);
 		}
 		void setPlan() {
 			factors.resize(0);
@@ -145,35 +134,30 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 				}
 				outputStep *= f;
 			}
-			
-			Step step;
-			step.type = StepType::permute;
-			plan.push_back(step);
 		}
 
 		template<bool inverse>
 		void fftStepGeneric(complex *origData, const Step &step) {
 			complex *working = workingVector.data();
+			const size_t stride = step.innerRepeats;
 
 			for (size_t outerRepeat = 0; outerRepeat < step.outerRepeats; ++outerRepeat) {
 				complex *data = origData;
 				
 				const complex *twiddles = twiddleVector.data() + step.twiddleIndex;
 				const size_t factor = step.factor;
-				const size_t stride = step.innerRepeats;
 				for (size_t repeat = 0; repeat < step.innerRepeats; ++repeat) {
 					for (size_t i = 0; i < step.factor; ++i) {
-						working[i] = data[i*stride];
+						working[i] = perf::complexMul<inverse>(data[i*stride], twiddles[i]);
 					}
 					for (size_t f = 0; f < factor; ++f) {
 						complex sum = working[0];
 						for (size_t i = 1; i < factor; ++i) {
 							V phase = 2*M_PI*f*i/factor;
 							complex factor = {cos(phase), -sin(phase)};
-							complex value = inverse ? perf::complexMul<true>(working[i], twiddles[i]) : working[i];
-							sum += perf::complexMul<inverse>(value, factor);
+							sum += perf::complexMul<inverse>(working[i], factor);
 						}
-						data[f*stride] = inverse ? sum : perf::complexMul<false>(sum, twiddles[f]);
+						data[f*stride] = sum;
 					}
 					++data;
 					twiddles += factor;
@@ -181,20 +165,20 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 				origData += step.factor*step.innerRepeats;
 			}
 		}
-		
+
 		template<bool inverse>
 		void fftStep2(complex *origData, const Step &step) {
+			const size_t stride = step.innerRepeats;
 			for (size_t outerRepeat = 0; outerRepeat < step.outerRepeats; ++outerRepeat) {
 				complex *data = origData;
 				
 				const complex *twiddles = twiddleVector.data() + step.twiddleIndex;
-				const size_t stride = step.innerRepeats;
-				for (size_t repeat = 0; repeat < step.innerRepeats; ++repeat) {
+				for (size_t repeat = 0; repeat < stride; ++repeat) {
 					complex A = data[0];
-					complex B = inverse ? perf::complexMul<true>(data[stride], twiddles[1]) : data[stride];
+					complex B = perf::complexMul<inverse>(data[stride], twiddles[1]);
 					
 					data[0] = A + B;
-					data[stride] = inverse ? A - B : perf::complexMul<false>(A - B, twiddles[1]);
+					data[stride] = A - B;
 
 					++data;
 					twiddles += 2;
@@ -205,25 +189,24 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 
 		template<bool inverse>
 		void fftStep3(complex *origData, const Step &step) {
-			const complex factor3 = {-0.5, inverse ? 0.8660254037844386 : -0.8660254037844386};
+			constexpr complex factor3 = {-0.5, inverse ? 0.8660254037844386 : -0.8660254037844386};
+			const size_t stride = step.innerRepeats;
+
 			for (size_t outerRepeat = 0; outerRepeat < step.outerRepeats; ++outerRepeat) {
 				complex *data = origData;
 				
 				const complex *twiddles = twiddleVector.data() + step.twiddleIndex;
-				const size_t stride = step.innerRepeats;
-				for (size_t repeat = 0; repeat < step.innerRepeats; ++repeat) {
+				for (size_t repeat = 0; repeat < stride; ++repeat) {
 					complex A = data[0];
-					complex B = inverse ? perf::complexMul<true>(data[stride], twiddles[1]) : data[stride];
-					complex C = inverse ? perf::complexMul<true>(data[stride*2], twiddles[2]) : data[stride*2];
-
+					complex B = perf::complexMul<inverse>(data[stride], twiddles[1]);
+					complex C = perf::complexMul<inverse>(data[stride*2], twiddles[2]);
+					
 					complex realSum = A + (B + C)*factor3.real();
 					complex imagSum = (B - C)*factor3.imag();
-					complex out1 = perf::complexAddI<false>(realSum, imagSum);
-					complex out2 = perf::complexAddI<true>(realSum, imagSum);
 
 					data[0] = A + B + C;
-					data[stride] = inverse ? out1 : perf::complexMul<false>(out1, twiddles[1]);
-					data[stride*2] = inverse ? out2 : perf::complexMul<false>(out2, twiddles[2]);
+					data[stride] = perf::complexAddI<false>(realSum, imagSum);
+					data[stride*2] = perf::complexAddI<true>(realSum, imagSum);
 
 					++data;
 					twiddles += 3;
@@ -232,82 +215,37 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			}
 		}
 
-		template<bool inverse>
-		void fftStep4(complex *origData, const Step &step) {
-			for (size_t outerRepeat = 0; outerRepeat < step.outerRepeats; ++outerRepeat) {
-				complex *data = origData;
-				
-				const complex *twiddles = twiddleVector.data() + step.twiddleIndex;
-				const size_t stride = step.innerRepeats;
-				for (size_t repeat = 0; repeat < step.innerRepeats; ++repeat) {
-					complex A = data[0];
-					complex B = inverse ? perf::complexMul<true>(data[stride*2], twiddles[2]) : data[stride];
-					complex C = inverse ? perf::complexMul<true>(data[stride], twiddles[1]) : data[stride*2];
-					complex D = inverse ? perf::complexMul<true>(data[stride*3], twiddles[3]) : data[stride*3];
-
-					complex sumAC = A + C, sumBD = B + D;
-					complex diffAC = A - C, diffBD = B - D;
-					
-					complex out0 = sumAC + sumBD;
-					complex out1 = sumAC - sumBD;
-					complex out2 = perf::complexAddI<!inverse>(diffAC, diffBD);
-					complex out3 = perf::complexAddI<inverse>(diffAC, diffBD);
-
-					data[0] = out0;
-					data[stride] = inverse ? out2 : perf::complexMul<false>(out1, twiddles[1]);
-					data[stride*2] = inverse ? out1 : perf::complexMul<false>(out2, twiddles[2]);
-					data[stride*3] = inverse ? out3 : perf::complexMul<false>(out3, twiddles[3]);
-
-					++data;
-					twiddles += 4;
-				}
-				origData += step.factor*step.innerRepeats;
-			}
-		}
-		template<bool inverse>
-		void permute(complex *data) {
-			complex *working = workingVector.data();
-			for (size_t i = 0; i < _size; ++i) {
-				working[i] = data[i];
-			}
-
+		void permute(const complex *input, complex *data) {
 			for (auto pair : permutation) {
-				if (inverse) {
-					data[pair.from] = working[pair.to];
-				} else {
-					data[pair.to] = working[pair.from];
-				}
+				data[pair.from] = input[pair.to];
 			}
 		}
 
 		template<bool inverse>
-		void run(complex *data) {
-			using std::swap;
+		void run(const complex *input, complex *data) {
+			permute(input, data);
 			
-//			std::cout << "start: ";
+//			std::cout << "input: ";
+//			for (size_t i = 0; i < _size; ++i) {
+//				std::cout << " " << input[i];
+//			}
+//			std::cout << std::endl;
+//			std::cout << "permuted: ";
 //			for (size_t i = 0; i < _size; ++i) {
 //				std::cout << " " << data[i];
 //			}
 //			std::cout << std::endl;
-			
-			Step *step = inverse ? plan.data() + plan.size() - 1 : plan.data();
-			Step *end = inverse ? plan.data() - 1 : plan.data() + plan.size();
-			for (; step != end; inverse ? --step : ++step) {
-				switch (step->type) {
-					case StepType::permute:
-						permute<inverse>(data);
-						break;
+
+			for (const Step &step : plan) {
+				switch (step.type) {
 					case StepType::generic:
-						fftStepGeneric<inverse>(data + step->startIndex, *step);
+						fftStepGeneric<inverse>(data + step.startIndex, step);
 						break;
 					case StepType::step2:
-						fftStep2<inverse>(data + step->startIndex, *step);
+						fftStep2<inverse>(data + step.startIndex, step);
 						break;
 					case StepType::step3:
-						fftStep3<inverse>(data + step->startIndex, *step);
-						break;
-					case StepType::step4:
-						fftStep4<inverse>(data + step->startIndex, *step);
+						fftStep3<inverse>(data + step.startIndex, step);
 						break;
 				}
 
@@ -380,24 +318,14 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			return fft(input.data(), output.data());
 		}
 		void fft(complex const *input, complex *output) {
-			if (output != input) {
-				for (size_t i = 0; i < _size; ++i) {
-					output[i] = input[i];
-				}
-			}
-			return run<false>(output);
+			return run<false>(input, output);
 		}
 
 		void ifft(std::vector<complex> const &input, std::vector<complex> &output) {
 			return ifft(input.data(), output.data());
 		}
 		void ifft(complex const *input, complex *output) {
-			if (output != input) {
-				for (size_t i = 0; i < _size; ++i) {
-					output[i] = input[i];
-				}
-			}
-			return run<true>(output);
+			return run<true>(input, output);
 		}
 	};
 }
