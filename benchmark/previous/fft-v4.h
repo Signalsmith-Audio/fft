@@ -41,11 +41,6 @@ namespace signalsmith_v4 {
 		}
 	}
 
-	template<typename V, size_t size>
-	class FixedFFT {
-		
-	};
-
 	template<typename V>
 	class FFT {
 		using complex = std::complex<V>;

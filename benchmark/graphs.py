@@ -41,6 +41,7 @@ article.save("out/previous", figure)
 
 figure, axis = article.wide()
 plot_if_exists(axis, "out/results/signalsmith.csv")
+plot_if_exists(axis, "out/results/dev-history-radix23.csv")
 plot_if_exists(axis, "out/results/dev-history-factorise.csv")
 plot_if_exists(axis, "out/results/dev-history-direct.csv")
 article.save("out/history", figure)
