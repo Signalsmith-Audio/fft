@@ -90,8 +90,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 				}
 			}
 
-//			if (false && repeats == 1 && sizeof(complex)*subLength > 65536) {
-			if (true) {
+			if (repeats == 1 && sizeof(complex)*subLength > 65536) {
 				for (size_t i = 0; i < factor; ++i) {
 					addPlanSteps(factorIndex + 1, start + i*subLength, subLength, 1);
 				}
@@ -169,21 +168,18 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		template<bool inverse>
 		void fftStep2(complex *origData, const Step &step) {
 			const size_t stride = step.innerRepeats;
+			const complex *origTwiddles = twiddleVector.data() + step.twiddleIndex;
 			for (size_t outerRepeat = 0; outerRepeat < step.outerRepeats; ++outerRepeat) {
-				complex *data = origData;
-				
-				const complex *twiddles = twiddleVector.data() + step.twiddleIndex;
-				for (size_t repeat = 0; repeat < stride; ++repeat) {
+				const complex* twiddles = origTwiddles;
+				for (complex *data = origData; data < origData + stride; ++data) {
 					complex A = data[0];
 					complex B = perf::complexMul<inverse>(data[stride], twiddles[1]);
 					
 					data[0] = A + B;
 					data[stride] = A - B;
-
-					++data;
 					twiddles += 2;
 				}
-				origData += step.factor*step.innerRepeats;
+				origData += 2*stride;
 			}
 		}
 
@@ -191,12 +187,11 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		void fftStep3(complex *origData, const Step &step) {
 			constexpr complex factor3 = {-0.5, inverse ? 0.8660254037844386 : -0.8660254037844386};
 			const size_t stride = step.innerRepeats;
-
+			const complex *origTwiddles = twiddleVector.data() + step.twiddleIndex;
+			
 			for (size_t outerRepeat = 0; outerRepeat < step.outerRepeats; ++outerRepeat) {
-				complex *data = origData;
-				
-				const complex *twiddles = twiddleVector.data() + step.twiddleIndex;
-				for (size_t repeat = 0; repeat < stride; ++repeat) {
+				const complex* twiddles = origTwiddles;
+				for (complex *data = origData; data < origData + stride; ++data) {
 					complex A = data[0];
 					complex B = perf::complexMul<inverse>(data[stride], twiddles[1]);
 					complex C = perf::complexMul<inverse>(data[stride*2], twiddles[2]);
@@ -208,10 +203,9 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 					data[stride] = perf::complexAddI<false>(realSum, imagSum);
 					data[stride*2] = perf::complexAddI<true>(realSum, imagSum);
 
-					++data;
 					twiddles += 3;
 				}
-				origData += step.factor*step.innerRepeats;
+				origData += 3*stride;
 			}
 		}
 
