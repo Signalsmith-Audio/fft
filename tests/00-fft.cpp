@@ -6,7 +6,6 @@
 #include "tests-common.h"
 
 std::vector<int> testSizes() {
-	return {1, 2, 4, 6};
 	return {
 		1, 2, 4, 8, 16, 32, 64, 128, 256,
 		3, 6, 9, 12, 18, 24,

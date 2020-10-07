@@ -29,7 +29,7 @@ out/test: *.h $(shell find tests -iname "*.h") $(shell find tests -iname "*.cpp"
 graphs:
 	python benchmark/graphs.py
 
-benchmark: test benchmark-main benchmark-previous benchmark-dev-history benchmark-kissfft benchmark-fftw
+benchmarks: test benchmark-main benchmark-previous benchmark-dev-history benchmark-kissfft benchmark-fftw graphs
 
 BENCHMARK_TEST_TIME := 0.05
 

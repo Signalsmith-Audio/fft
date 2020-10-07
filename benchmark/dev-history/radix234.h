@@ -227,8 +227,8 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 				const complex* twiddles = origTwiddles;
 				for (complex *data = origData; data < origData + stride; ++data) {
 					complex A = data[0];
-					complex C = perf::complexMul<inverse>(data[stride], twiddles[2]);
-					complex B = perf::complexMul<inverse>(data[stride*2], twiddles[1]);
+					complex C = perf::complexMul<inverse>(data[stride], twiddles[1]);
+					complex B = perf::complexMul<inverse>(data[stride*2], twiddles[2]);
 					complex D = perf::complexMul<inverse>(data[stride*3], twiddles[3]);
 
 					complex sumAC = A + C, sumBD = B + D;

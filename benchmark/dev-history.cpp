@@ -47,4 +47,11 @@ Benchmark<DevHistory<signalsmith_factorise::FFT, factoriseName, factoriseTag>, 8
 #define SIGNALSMITH_FFT_NAMESPACE signalsmith_radix23
 #include "dev-history/radix23.h"
 char radix23Name[] = "Radix 2/3", radix23Tag[] = "dev-history-radix23";
-Benchmark<DevHistory<signalsmith_radix23::FFT, radix23Name, radix23Tag>> benchRadix23;
+Benchmark<DevHistory<signalsmith_radix23::FFT, radix23Name, radix23Tag>, 1048576> benchRadix23;
+
+#undef SIGNALSMITH_FFT_V5
+#undef SIGNALSMITH_FFT_NAMESPACE
+#define SIGNALSMITH_FFT_NAMESPACE signalsmith_radix234
+#include "dev-history/radix234.h"
+char radix234Name[] = "Radix 2/3/4", radix234Tag[] = "dev-history-radix234";
+Benchmark<DevHistory<signalsmith_radix234::FFT, radix234Name, radix234Tag>> benchRadix234;
