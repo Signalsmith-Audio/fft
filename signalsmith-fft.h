@@ -91,11 +91,21 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			if (factor == 4) mainStep.type = StepType::step4;
 
 			// Twiddles
-			for (size_t i = 0; i < subLength; ++i) {
-				for (size_t f = 0; f < factor; ++f) {
-					V phase = 2*M_PI*i*f/length;
-					complex twiddle = {cos(phase), -sin(phase)};
-					twiddleVector.push_back(twiddle);
+			bool foundStep = false;
+			for (const Step &existingStep : plan) {
+				if (existingStep.factor == mainStep.factor && existingStep.innerRepeats == mainStep.innerRepeats) {
+					foundStep = true;
+					mainStep.twiddleIndex = existingStep.twiddleIndex;
+					break;
+				}
+			}
+			if (!foundStep) {
+				for (size_t i = 0; i < subLength; ++i) {
+					for (size_t f = 0; f < factor; ++f) {
+						V phase = 2*M_PI*i*f/length;
+						complex twiddle = {cos(phase), -sin(phase)};
+						twiddleVector.push_back(twiddle);
+					}
 				}
 			}
 
