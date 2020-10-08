@@ -138,9 +138,22 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			
 			permutation.resize(0);
 			permutation.push_back(PermutationPair{0, 0});
-			size_t inputStep = _size, outputStep = 1;
-			for (size_t f : factors) {
-				inputStep /= f;
+			size_t indexLow = 0, indexHigh = factors.size();
+			size_t inputStepLow = _size, outputStepLow = 1;
+			size_t inputStepHigh = 1, outputStepHigh = _size;
+			while (outputStepLow*inputStepHigh < _size) {
+				size_t f, inputStep, outputStep;
+				if (outputStepLow <= inputStepHigh) {
+					f = factors[indexLow++];
+					inputStep = (inputStepLow /= f);
+					outputStep = outputStepLow;
+					outputStepLow *= f;
+				} else {
+					f = factors[--indexHigh];
+					inputStep = inputStepHigh;
+					inputStepHigh *= f;
+					outputStep = (outputStepHigh /= f);
+				}
 				size_t oldSize = permutation.size();
 				for (size_t i = 1; i < f; ++i) {
 					for (size_t j = 0; j < oldSize; ++j) {
@@ -150,7 +163,6 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 						permutation.push_back(pair);
 					}
 				}
-				outputStep *= f;
 			}
 		}
 
@@ -310,7 +322,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			return filter[size];
 		}
 	public:
-		static size_t fastSizeAbove(size_t size) {
+		static size_t sizeMinimum(size_t size) {
 			size_t power2 = 1;
 			while (size >= 32) {
 				size = (size - 1)/2 + 1;
@@ -321,7 +333,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			}
 			return power2*size;
 		}
-		static size_t fastSizeBelow(size_t size) {
+		static size_t sizeMaximum(size_t size) {
 			size_t power2 = 1;
 			while (size >= 32) {
 				size /= 2;
@@ -334,8 +346,8 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		}
 
 		FFT(size_t size, int fastDirection=0) : _size(0) {
-			if (fastDirection > 0) size = fastSizeAbove(size);
-			if (fastDirection < 0) size = fastSizeBelow(size);
+			if (fastDirection > 0) size = sizeMinimum(size);
+			if (fastDirection < 0) size = sizeMaximum(size);
 			this->setSize(size);
 		}
 
@@ -348,10 +360,10 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			return _size;
 		}
 		size_t setSizeMinimum(size_t size) {
-			return setSize(fastSizeAbove(size));
+			return setSize(sizeMinimum(size));
 		}
 		size_t setSizeMaximum(size_t size) {
-			return setSize(fastSizeBelow(size));
+			return setSize(sizeMaximum(size));
 		}
 		const size_t & size() const {
 			return size;

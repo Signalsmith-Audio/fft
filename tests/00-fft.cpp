@@ -169,8 +169,8 @@ TEST("Sizes", sizes) {
 	using signalsmith::FFT;
 
 	for (size_t i = 1; i < 1000; ++i) {
-		size_t above = FFT<double>::fastSizeAbove(i);
-		size_t below = FFT<double>::fastSizeBelow(i);
+		size_t above = FFT<double>::sizeMinimum(i);
+		size_t below = FFT<double>::sizeMaximum(i);
 
 		if (above < i) return test.fail("above < i");
 		if (below > i) return test.fail("below > i");
