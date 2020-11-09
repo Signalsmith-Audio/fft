@@ -297,10 +297,10 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 
 		static bool validSize(size_t size) {
 			constexpr static bool filter[32] = {
-				1, 1, 1, 1, 1, 1, 1, 0, 1, 1, // 0-9
-				1, 0, 1, 0, 0, 1, 1, 0, 1, 0, // 10-19
-				1, 0, 0, 0, 1, 1, 0, 0/*27*/, 0, 0, // 20-29
-				1, 0
+				1, 1, 1, 1, 1, 0, 1, 0, 1, 1, // 0-9
+				0, 0, 1, 0, 0, 0, 1, 0, 1, 0, // 10-19
+				0, 0, 0, 0, 1, 0, 0, 0, 0, 0, // 20-29
+				0, 0
 			};
 			return filter[size];
 		}
@@ -349,7 +349,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			return setSize(sizeMaximum(size));
 		}
 		const size_t & size() const {
-			return size;
+			return _size;
 		}
 
 		void fft(std::vector<complex> const &input, std::vector<complex> &output) {
@@ -366,7 +366,121 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			return run<true>(input, output);
 		}
 	};
-}
+	
+//	template<typename V>
+//	class RealFFT {
+//		using complex = std::complex<V>;
+//		FFT<V> fft;
+//	public:
+//		static size_t sizeMinimum(size_t size) {
+//			return (FFT<V>::sizeMinimum((size - 1)/2) + 1)*2;
+//		}
+//		static size_t sizeMaximum(size_t size) {
+//			return FFT<V>::sizeMinimum(size/2)*2;
+//		}
+//
+//		FFT(size_t size, int fastDirection=0) : _size(0) {
+//			if (fastDirection > 0) size = sizeMinimum(size);
+//			if (fastDirection < 0) size = sizeMaximum(size);
+//			this->setSize(size);
+//		}
+//
+//		size_t setSize(size_t size) {
+//			return fft->setSize(size/2)*2;
+//		}
+//		size_t setSizeMinimum(size_t size) {
+//			return setSize(sizeMinimum(size));
+//		}
+//		size_t setSizeMaximum(size_t size) {
+//			return setSize(sizeMaximum(size));
+//		}
+//		const size_t & size() const {
+//			return fft.size()*2;
+//		}
+//
+//		void fft(std::vector<double> const &input, std::vector<complex> &output) {
+//			return fft(input.data(), output.data());
+//		}
+//		void fft(double const *input, complex *output) {
+//			return run<false>(input, output);
+//		}
+//
+//		void ifft(std::vector<complex> const &input, std::vector<double> &output) {
+//			return ifft(input.data(), output.data());
+//		}
+//		void ifft(complex const *input, double *output) {
+//			return run<true>(input, output);
+//		}
+//	};
+
+	template<typename V>
+	class RealFFT {
+		using complex = std::complex<V>;
+		std::vector<complex> complexBuffer1, complexBuffer2;
+		FFT<V> complexFft;
+	public:
+		static size_t sizeMinimum(size_t size) {
+			return (FFT<V>::sizeMinimum((size - 1)/2) + 1)*2;
+		}
+		static size_t sizeMaximum(size_t size) {
+			return FFT<V>::sizeMinimum(size/2)*2;
+		}
+
+		RealFFT(size_t size, int fastDirection=0) : complexFft(0) {
+			if (fastDirection > 0) size = sizeMinimum(size);
+			if (fastDirection < 0) size = sizeMaximum(size);
+			this->setSize(size);
+		}
+
+		size_t setSize(size_t size) {
+			complexBuffer1.resize(size);
+			complexBuffer2.resize(size);
+			return complexFft.setSize(size/2*2);
+		}
+		size_t setSizeMinimum(size_t size) {
+			return setSize(sizeMinimum(size));
+		}
+		size_t setSizeMaximum(size_t size) {
+			return setSize(sizeMaximum(size));
+		}
+		const size_t & size() const {
+			return complexFft.size();
+		}
+
+		void fft(std::vector<double> const &input, std::vector<complex> &output) {
+			return fft(input.data(), output.data());
+		}
+		void fft(double const *input, complex *output) {
+			for (size_t i = 0; i < size(); ++i) {
+				complexBuffer1[i] = input[i];
+			}
+			
+			complexFft.fft(complexBuffer1.data(), complexBuffer2.data());
+			
+			output[0] = complex{complexBuffer2[0].real(), complexBuffer2[size()/2].real()};
+			for (size_t i = 1; i < size()/2; ++i) {
+				output[i] = complexBuffer2[i];
+			}
+		}
+
+		void ifft(std::vector<complex> const &input, std::vector<double> &output) {
+			return ifft(input.data(), output.data());
+		}
+		void ifft(complex const *input, double *output) {
+			complexBuffer1[0] = input[0].real();
+			complexBuffer1[size()/2] = input[0].imag();
+			for (size_t i = 1; i < size()/2; ++i) {
+				complexBuffer1[i] = input[i];
+				complexBuffer1[size() - i] = conj(input[i]);
+			}
+			
+			complexFft.ifft(complexBuffer1.data(), complexBuffer2.data());
+			
+			for (size_t i = 0; i < size(); ++i) {
+				output[i] = complexBuffer2[i].real();
+			}
+		}
+	};}
 
 #undef SIGNALSMITH_FFT_NAMESPACE
 #endif // SIGNALSMITH_FFT_V5
