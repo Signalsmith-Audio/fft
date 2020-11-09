@@ -277,17 +277,6 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		void run(const complex *input, complex *data) {
 			permute(input, data);
 			
-//			std::cout << "input: ";
-//			for (size_t i = 0; i < _size; ++i) {
-//				std::cout << " " << input[i];
-//			}
-//			std::cout << std::endl;
-//			std::cout << "permuted: ";
-//			for (size_t i = 0; i < _size; ++i) {
-//				std::cout << " " << data[i];
-//			}
-//			std::cout << std::endl;
-
 			for (const Step &step : plan) {
 				switch (step.type) {
 					case StepType::generic:
@@ -303,12 +292,6 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 						fftStep4<inverse>(data + step.startIndex, step);
 						break;
 				}
-
-//				std::cout << "\t";
-//				for (size_t i = 0; i < _size; ++i) {
-//					std::cout << " " << data[i];
-//				}
-//				std::cout << std::endl;
 			}
 		}
 
