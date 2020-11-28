@@ -422,10 +422,8 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			return complexFft.size()*2;
 		}
 
-		void fft(std::vector<V> const &input, std::vector<complex> &output) {
-			return fft(input.data(), output.data());
-		}
-		void fft(V const *input, complex *output) {
+		template<typename InputIterator, typename OutputIterator>
+		void fft(InputIterator &input, OutputIterator &output) {
 			size_t hSize = complexFft.size();
 			for (size_t i = 0; i < hSize; ++i) {
 				if (modified) {
@@ -453,10 +451,8 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			}
 		}
 
-		void ifft(std::vector<complex> const &input, std::vector<V> &output) {
-			return ifft(input.data(), output.data());
-		}
-		void ifft(complex const *input, V *output) {
+		template<typename InputIterator, typename OutputIterator>
+		void ifft(InputIterator &input, OutputIterator &output) {
 			size_t hSize = complexFft.size();
 			if (!modified) complexBuffer1[0] = {
 				input[0].real() + input[0].imag(),
