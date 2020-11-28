@@ -47,6 +47,20 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			};
 		}
 	}
+	
+	// Use SFINAE to get an iterator from std::begin(), if supported - otherwise assume the value itself is an iterator
+	template<typename T, typename=void>
+	struct GetIterator {
+		static T get(const T &t) {
+			return t;
+		}
+	};
+	template<typename T>
+	struct GetIterator<T, decltype((void)std::begin(std::declval<T>()))> {
+		static auto get(const T &t) -> decltype(std::begin(t)) {
+			return std::begin(t);
+		}
+	};
 
 	template<typename V>
 	class FFT {
@@ -166,13 +180,13 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			}
 		}
 
-		template<bool inverse>
-		void fftStepGeneric(complex *origData, const Step &step) {
+		template<bool inverse, typename RandomAccessIterator>
+		void fftStepGeneric(RandomAccessIterator &&origData, const Step &step) {
 			complex *working = workingVector.data();
 			const size_t stride = step.innerRepeats;
 
 			for (size_t outerRepeat = 0; outerRepeat < step.outerRepeats; ++outerRepeat) {
-				complex *data = origData;
+				RandomAccessIterator data = origData;
 				
 				const complex *twiddles = twiddleVector.data() + step.twiddleIndex;
 				const size_t factor = step.factor;
@@ -196,13 +210,13 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			}
 		}
 
-		template<bool inverse>
-		void fftStep2(complex *origData, const Step &step) {
+		template<bool inverse, typename RandomAccessIterator>
+		void fftStep2(RandomAccessIterator &&origData, const Step &step) {
 			const size_t stride = step.innerRepeats;
 			const complex *origTwiddles = twiddleVector.data() + step.twiddleIndex;
 			for (size_t outerRepeat = 0; outerRepeat < step.outerRepeats; ++outerRepeat) {
 				const complex* twiddles = origTwiddles;
-				for (complex *data = origData; data < origData + stride; ++data) {
+				for (RandomAccessIterator data = origData; data < origData + stride; ++data) {
 					complex A = data[0];
 					complex B = perf::complexMul<inverse>(data[stride], twiddles[1]);
 					
@@ -214,15 +228,15 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			}
 		}
 
-		template<bool inverse>
-		void fftStep3(complex *origData, const Step &step) {
+		template<bool inverse, typename RandomAccessIterator>
+		void fftStep3(RandomAccessIterator &&origData, const Step &step) {
 			constexpr complex factor3 = {-0.5, inverse ? 0.8660254037844386 : -0.8660254037844386};
 			const size_t stride = step.innerRepeats;
 			const complex *origTwiddles = twiddleVector.data() + step.twiddleIndex;
 			
 			for (size_t outerRepeat = 0; outerRepeat < step.outerRepeats; ++outerRepeat) {
 				const complex* twiddles = origTwiddles;
-				for (complex *data = origData; data < origData + stride; ++data) {
+				for (RandomAccessIterator data = origData; data < origData + stride; ++data) {
 					complex A = data[0];
 					complex B = perf::complexMul<inverse>(data[stride], twiddles[1]);
 					complex C = perf::complexMul<inverse>(data[stride*2], twiddles[2]);
@@ -240,14 +254,14 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			}
 		}
 
-		template<bool inverse>
-		void fftStep4(complex *origData, const Step &step) {
+		template<bool inverse, typename RandomAccessIterator>
+		void fftStep4(RandomAccessIterator &&origData, const Step &step) {
 			const size_t stride = step.innerRepeats;
 			const complex *origTwiddles = twiddleVector.data() + step.twiddleIndex;
 			
 			for (size_t outerRepeat = 0; outerRepeat < step.outerRepeats; ++outerRepeat) {
 				const complex* twiddles = origTwiddles;
-				for (complex *data = origData; data < origData + stride; ++data) {
+				for (RandomAccessIterator data = origData; data < origData + stride; ++data) {
 					complex A = data[0];
 					complex C = perf::complexMul<inverse>(data[stride], twiddles[2]);
 					complex B = perf::complexMul<inverse>(data[stride*2], twiddles[1]);
@@ -267,14 +281,15 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			}
 		}
 		
-		void permute(const complex *input, complex *data) {
+		template<typename InputIterator, typename OutputIterator>
+		void permute(InputIterator input, OutputIterator data) {
 			for (auto pair : permutation) {
 				data[pair.from] = input[pair.to];
 			}
 		}
 
-		template<bool inverse>
-		void run(const complex *input, complex *data) {
+		template<bool inverse, typename InputIterator, typename OutputIterator>
+		void run(InputIterator &&input, OutputIterator &&data) {
 			permute(input, data);
 			
 			for (const Step &step : plan) {
@@ -352,18 +367,18 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			return _size;
 		}
 
-		void fft(std::vector<complex> const &input, std::vector<complex> &output) {
-			return fft(input.data(), output.data());
-		}
-		void fft(complex const *input, complex *output) {
-			return run<false>(input, output);
+		template<typename InputIterator, typename OutputIterator>
+		void fft(InputIterator &&input, OutputIterator &&output) {
+			auto inputIter = GetIterator<InputIterator>::get(input);
+			auto outputIter = GetIterator<OutputIterator>::get(output);
+			return run<false>(inputIter, outputIter);
 		}
 
-		void ifft(std::vector<complex> const &input, std::vector<complex> &output) {
-			return ifft(input.data(), output.data());
-		}
-		void ifft(complex const *input, complex *output) {
-			return run<true>(input, output);
+		template<typename InputIterator, typename OutputIterator>
+		void ifft(InputIterator &&input, OutputIterator &&output) {
+			auto inputIter = GetIterator<InputIterator>::get(input);
+			auto outputIter = GetIterator<OutputIterator>::get(output);
+			return run<true>(inputIter, outputIter);
 		}
 	};
 
@@ -423,7 +438,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		}
 
 		template<typename InputIterator, typename OutputIterator>
-		void fft(InputIterator &input, OutputIterator &output) {
+		void fft(InputIterator &&input, OutputIterator &&output) {
 			size_t hSize = complexFft.size();
 			for (size_t i = 0; i < hSize; ++i) {
 				if (modified) {
@@ -452,7 +467,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		}
 
 		template<typename InputIterator, typename OutputIterator>
-		void ifft(InputIterator &input, OutputIterator &output) {
+		void ifft(InputIterator &&input, OutputIterator &&output) {
 			size_t hSize = complexFft.size();
 			if (!modified) complexBuffer1[0] = {
 				input[0].real() + input[0].imag(),
