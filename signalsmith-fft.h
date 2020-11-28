@@ -366,52 +366,6 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			return run<true>(input, output);
 		}
 	};
-	
-//	template<typename V>
-//	class RealFFT {
-//		using complex = std::complex<V>;
-//		FFT<V> fft;
-//	public:
-//		static size_t sizeMinimum(size_t size) {
-//			return (FFT<V>::sizeMinimum((size - 1)/2) + 1)*2;
-//		}
-//		static size_t sizeMaximum(size_t size) {
-//			return FFT<V>::sizeMinimum(size/2)*2;
-//		}
-//
-//		FFT(size_t size, int fastDirection=0) : _size(0) {
-//			if (fastDirection > 0) size = sizeMinimum(size);
-//			if (fastDirection < 0) size = sizeMaximum(size);
-//			this->setSize(size);
-//		}
-//
-//		size_t setSize(size_t size) {
-//			return fft->setSize(size/2)*2;
-//		}
-//		size_t setSizeMinimum(size_t size) {
-//			return setSize(sizeMinimum(size));
-//		}
-//		size_t setSizeMaximum(size_t size) {
-//			return setSize(sizeMaximum(size));
-//		}
-//		const size_t & size() const {
-//			return fft.size()*2;
-//		}
-//
-//		void fft(std::vector<double> const &input, std::vector<complex> &output) {
-//			return fft(input.data(), output.data());
-//		}
-//		void fft(double const *input, complex *output) {
-//			return run<false>(input, output);
-//		}
-//
-//		void ifft(std::vector<complex> const &input, std::vector<double> &output) {
-//			return ifft(input.data(), output.data());
-//		}
-//		void ifft(complex const *input, double *output) {
-//			return run<true>(input, output);
-//		}
-//	};
 
 	template<typename V>
 	class RealFFT {
@@ -433,9 +387,9 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		}
 
 		size_t setSize(size_t size) {
-			complexBuffer1.resize(size);
-			complexBuffer2.resize(size);
-			return complexFft.setSize(size/2*2);
+			complexBuffer1.resize(size/2);
+			complexBuffer2.resize(size/2);
+			return complexFft.setSize(size/2);
 		}
 		size_t setSizeMinimum(size_t size) {
 			return setSize(sizeMinimum(size));
@@ -443,44 +397,73 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		size_t setSizeMaximum(size_t size) {
 			return setSize(sizeMaximum(size));
 		}
-		const size_t & size() const {
-			return complexFft.size();
+		size_t size() const {
+			return complexFft.size()*2;
 		}
 
-		void fft(std::vector<double> const &input, std::vector<complex> &output) {
+		void fft(std::vector<V> const &input, std::vector<complex> &output) {
 			return fft(input.data(), output.data());
 		}
-		void fft(double const *input, complex *output) {
-			for (size_t i = 0; i < size(); ++i) {
-				complexBuffer1[i] = input[i];
+		void fft(V const *input, complex *output) {
+			size_t hSize = complexFft.size(), size = hSize*2;
+			for (size_t i = 0; i < hSize; ++i) {
+				complexBuffer1[i] = {input[2*i], input[2*i + 1]};
 			}
 			
 			complexFft.fft(complexBuffer1.data(), complexBuffer2.data());
 			
-			output[0] = complex{complexBuffer2[0].real(), complexBuffer2[size()/2].real()};
-			for (size_t i = 1; i < size()/2; ++i) {
-				output[i] = complexBuffer2[i];
+			output[0] = {
+				complexBuffer2[0].real() + complexBuffer2[0].imag(),
+				complexBuffer2[0].real() - complexBuffer2[0].imag()
+			};
+			for (size_t i = 1; i < hSize; ++i) {
+				size_t i2 = hSize - i;
+				
+				complex odd = (complexBuffer2[i] + conj(complexBuffer2[i2]))*0.5;
+				complex evenI = (complexBuffer2[i] - conj(complexBuffer2[i2]))*0.5;
+				
+				double rotPhase = -2*M_PI*i/size;
+				//complex rot = {cos(rotPhase), sin(rotPhase)};
+				complex rotMinusI = {sin(rotPhase), -cos(rotPhase)};
+				
+				output[i] = odd + rotMinusI*evenI;
 			}
 		}
 
-		void ifft(std::vector<complex> const &input, std::vector<double> &output) {
+		void ifft(std::vector<complex> const &input, std::vector<V> &output) {
 			return ifft(input.data(), output.data());
 		}
-		void ifft(complex const *input, double *output) {
-			complexBuffer1[0] = input[0].real();
-			complexBuffer1[size()/2] = input[0].imag();
-			for (size_t i = 1; i < size()/2; ++i) {
-				complexBuffer1[i] = input[i];
-				complexBuffer1[size() - i] = conj(input[i]);
+		void ifft(complex const *input, V *output) {
+			size_t hSize = complexFft.size(), size = hSize*2;
+			complexBuffer1[0] = {
+				input[0].real() + input[0].imag(),
+				input[0].real() - input[0].imag()
+			};
+			for (size_t i = 1; i < hSize; ++i) {
+				size_t conjI = hSize - i;
+				complex v = input[i], v2 = input[conjI];
+
+				double rotPhase = -2*M_PI*i/size;
+				//complex rot = {cos(rotPhase), sin(rotPhase)};
+				complex rotMinusI = {sin(rotPhase), -cos(rotPhase)};
+
+				complex odd = v + conj(v2);
+				complex evenRotMinusI = v - conj(v2);
+				complex evenI = evenRotMinusI*conj(rotMinusI);
+				
+				complexBuffer1[i] = odd + evenI;
+				complexBuffer1[conjI] = conj(odd - evenI);
 			}
 			
 			complexFft.ifft(complexBuffer1.data(), complexBuffer2.data());
 			
-			for (size_t i = 0; i < size(); ++i) {
-				output[i] = complexBuffer2[i].real();
+			for (size_t i = 0; i < hSize; ++i) {
+				output[2*i] = complexBuffer2[i].real();
+				output[2*i + 1] = complexBuffer2[i].imag();
 			}
 		}
-	};}
+	};
+}
 
 #undef SIGNALSMITH_FFT_NAMESPACE
 #endif // SIGNALSMITH_FFT_V5
