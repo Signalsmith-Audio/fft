@@ -374,6 +374,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		using complex = std::complex<V>;
 		std::vector<complex> complexBuffer1, complexBuffer2;
 		std::vector<complex> twiddlesMinusI;
+		std::vector<complex> modifiedRotations;
 		FFT<V> complexFft;
 		
 		static constexpr bool modified = (optionFlags&SIGNALSMITH_HALFROTATION);
@@ -401,6 +402,13 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 				double rotPhase = -2*M_PI*(modified ? i + 0.5 : i)/size;
 				twiddlesMinusI[i] = {sin(rotPhase), -cos(rotPhase)};
 			}
+			if (modified) {
+				modifiedRotations.resize(size/2);
+				for (size_t i = 0; i < size/2; ++i) {
+					double rotPhase = -2*M_PI*i/size;
+					modifiedRotations[i] = {cos(rotPhase), sin(rotPhase)};
+				}
+			}
 			
 			return complexFft.setSize(size/2);
 		}
@@ -420,13 +428,10 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		void fft(V const *input, complex *output) {
 			size_t hSize = complexFft.size();
 			for (size_t i = 0; i < hSize; ++i) {
-				complexBuffer1[i] = {input[2*i], input[2*i + 1]};
-			}
-			if (modified) {
-				for (size_t i = 0; i < hSize; ++i) {
-					double rotPhase = -M_PI*i/hSize;
-					complex rot = {cos(rotPhase), sin(rotPhase)};
-					complexBuffer1[i] *= rot;
+				if (modified) {
+					complexBuffer1[i] = perf::complexMul<false>({input[2*i], input[2*i + 1]}, modifiedRotations[i]);
+				} else {
+					complexBuffer1[i] = {input[2*i], input[2*i + 1]};
 				}
 			}
 			
@@ -473,11 +478,7 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			
 			for (size_t i = 0; i < hSize; ++i) {
 				complex v = complexBuffer2[i];
-				if (modified) {
-					double rotPhase = -M_PI*i/hSize;
-					complex rot = {cos(rotPhase), sin(rotPhase)};
-					v *= conj(rot);
-				}
+				if (modified) v = perf::complexMul<true>(v, modifiedRotations[i]);
 				output[2*i] = v.real();
 				output[2*i + 1] = v.imag();
 			}
