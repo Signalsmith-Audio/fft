@@ -367,11 +367,16 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		}
 	};
 
-	template<typename V>
+#define SIGNALSMITH_HALFROTATION 1
+
+	template<typename V, int optionFlags=0>
 	class RealFFT {
 		using complex = std::complex<V>;
 		std::vector<complex> complexBuffer1, complexBuffer2;
+		std::vector<complex> twiddlesMinusI;
 		FFT<V> complexFft;
+		
+		static constexpr bool modified = (optionFlags&SIGNALSMITH_HALFROTATION);
 	public:
 		static size_t sizeMinimum(size_t size) {
 			return (FFT<V>::sizeMinimum((size - 1)/2) + 1)*2;
@@ -389,6 +394,14 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		size_t setSize(size_t size) {
 			complexBuffer1.resize(size/2);
 			complexBuffer2.resize(size/2);
+
+			size_t hhSize = size/4 + 1;
+			twiddlesMinusI.resize(hhSize);
+			for (size_t i = 0; i < hhSize; ++i) {
+				double rotPhase = -2*M_PI*(modified ? i + 0.5 : i)/size;
+				twiddlesMinusI[i] = {sin(rotPhase), -cos(rotPhase)};
+			}
+			
 			return complexFft.setSize(size/2);
 		}
 		size_t setSizeMinimum(size_t size) {
@@ -405,28 +418,33 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			return fft(input.data(), output.data());
 		}
 		void fft(V const *input, complex *output) {
-			size_t hSize = complexFft.size(), size = hSize*2;
+			size_t hSize = complexFft.size();
 			for (size_t i = 0; i < hSize; ++i) {
 				complexBuffer1[i] = {input[2*i], input[2*i + 1]};
+			}
+			if (modified) {
+				for (size_t i = 0; i < hSize; ++i) {
+					double rotPhase = -M_PI*i/hSize;
+					complex rot = {cos(rotPhase), sin(rotPhase)};
+					complexBuffer1[i] *= rot;
+				}
 			}
 			
 			complexFft.fft(complexBuffer1.data(), complexBuffer2.data());
 			
-			output[0] = {
+			if (!modified) output[0] = {
 				complexBuffer2[0].real() + complexBuffer2[0].imag(),
 				complexBuffer2[0].real() - complexBuffer2[0].imag()
 			};
-			for (size_t i = 1; i < hSize; ++i) {
-				size_t i2 = hSize - i;
+			for (size_t i = modified ? 0 : 1; i <= hSize/2; ++i) {
+				size_t conjI = modified ? (hSize  - 1 - i) : (hSize - i);
 				
-				complex odd = (complexBuffer2[i] + conj(complexBuffer2[i2]))*0.5;
-				complex evenI = (complexBuffer2[i] - conj(complexBuffer2[i2]))*0.5;
-				
-				double rotPhase = -2*M_PI*i/size;
-				//complex rot = {cos(rotPhase), sin(rotPhase)};
-				complex rotMinusI = {sin(rotPhase), -cos(rotPhase)};
-				
-				output[i] = odd + rotMinusI*evenI;
+				complex odd = (complexBuffer2[i] + conj(complexBuffer2[conjI]))*0.5;
+				complex evenI = (complexBuffer2[i] - conj(complexBuffer2[conjI]))*0.5;
+				complex evenRotMinusI = perf::complexMul<false>(evenI, twiddlesMinusI[i]);
+
+				output[i] = odd + evenRotMinusI;
+				output[conjI] = conj(odd - evenRotMinusI);
 			}
 		}
 
@@ -434,22 +452,18 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			return ifft(input.data(), output.data());
 		}
 		void ifft(complex const *input, V *output) {
-			size_t hSize = complexFft.size(), size = hSize*2;
-			complexBuffer1[0] = {
+			size_t hSize = complexFft.size();
+			if (!modified) complexBuffer1[0] = {
 				input[0].real() + input[0].imag(),
 				input[0].real() - input[0].imag()
 			};
-			for (size_t i = 1; i < hSize; ++i) {
-				size_t conjI = hSize - i;
+			for (size_t i = modified ? 0 : 1; i <= hSize/2; ++i) {
+				size_t conjI = modified ? (hSize  - 1 - i) : (hSize - i);
 				complex v = input[i], v2 = input[conjI];
-
-				double rotPhase = -2*M_PI*i/size;
-				//complex rot = {cos(rotPhase), sin(rotPhase)};
-				complex rotMinusI = {sin(rotPhase), -cos(rotPhase)};
 
 				complex odd = v + conj(v2);
 				complex evenRotMinusI = v - conj(v2);
-				complex evenI = evenRotMinusI*conj(rotMinusI);
+				complex evenI = perf::complexMul<true>(evenRotMinusI, twiddlesMinusI[i]);
 				
 				complexBuffer1[i] = odd + evenI;
 				complexBuffer1[conjI] = conj(odd - evenI);
@@ -458,11 +472,23 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			complexFft.ifft(complexBuffer1.data(), complexBuffer2.data());
 			
 			for (size_t i = 0; i < hSize; ++i) {
-				output[2*i] = complexBuffer2[i].real();
-				output[2*i + 1] = complexBuffer2[i].imag();
+				complex v = complexBuffer2[i];
+				if (modified) {
+					double rotPhase = -M_PI*i/hSize;
+					complex rot = {cos(rotPhase), sin(rotPhase)};
+					v *= conj(rot);
+				}
+				output[2*i] = v.real();
+				output[2*i + 1] = v.imag();
 			}
 		}
 	};
+
+	template<typename V>
+	struct ModifiedRealFFT : public RealFFT<V, SIGNALSMITH_HALFROTATION> {
+		using RealFFT<V, SIGNALSMITH_HALFROTATION>::RealFFT;
+	};
+#undef SIGNALSMITH_HALFROTATION
 }
 
 #undef SIGNALSMITH_FFT_NAMESPACE
