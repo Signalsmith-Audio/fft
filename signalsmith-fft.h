@@ -382,17 +382,19 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 		}
 	};
 
-#define SIGNALSMITH_HALFROTATION 1
+	struct FFTOptions {
+		static constexpr int halfFreqShift = 1;
+	};
 
 	template<typename V, int optionFlags=0>
 	class RealFFT {
+		static constexpr bool modified = (optionFlags&FFTOptions::halfFreqShift);
+
 		using complex = std::complex<V>;
 		std::vector<complex> complexBuffer1, complexBuffer2;
 		std::vector<complex> twiddlesMinusI;
 		std::vector<complex> modifiedRotations;
 		FFT<V> complexFft;
-		
-		static constexpr bool modified = (optionFlags&SIGNALSMITH_HALFROTATION);
 	public:
 		static size_t sizeMinimum(size_t size) {
 			return (FFT<V>::sizeMinimum((size - 1)/2) + 1)*2;
@@ -457,8 +459,8 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 			for (size_t i = modified ? 0 : 1; i <= hSize/2; ++i) {
 				size_t conjI = modified ? (hSize  - 1 - i) : (hSize - i);
 				
-				complex odd = (complexBuffer2[i] + conj(complexBuffer2[conjI]))*0.5;
-				complex evenI = (complexBuffer2[i] - conj(complexBuffer2[conjI]))*0.5;
+				complex odd = (complexBuffer2[i] + conj(complexBuffer2[conjI]))*(V)0.5;
+				complex evenI = (complexBuffer2[i] - conj(complexBuffer2[conjI]))*(V)0.5;
 				complex evenRotMinusI = perf::complexMul<false>(evenI, twiddlesMinusI[i]);
 
 				output[i] = odd + evenRotMinusI;
@@ -497,10 +499,9 @@ namespace SIGNALSMITH_FFT_NAMESPACE {
 	};
 
 	template<typename V>
-	struct ModifiedRealFFT : public RealFFT<V, SIGNALSMITH_HALFROTATION> {
-		using RealFFT<V, SIGNALSMITH_HALFROTATION>::RealFFT;
+	struct ModifiedRealFFT : public RealFFT<V, FFTOptions::halfFreqShift> {
+		using RealFFT<V, FFTOptions::halfFreqShift>::RealFFT;
 	};
-#undef SIGNALSMITH_HALFROTATION
 }
 
 #undef SIGNALSMITH_FFT_NAMESPACE
