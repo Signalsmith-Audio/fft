@@ -3,7 +3,7 @@ ifndef VERBOSE
 .SILENT:
 endif
 
-SHARED_PATH := "geraint"
+SHARED_PATH := "common"
 
 clean:
 	rm -rf out
@@ -29,7 +29,7 @@ out/test: *.h $(shell find tests -iname "*.h") $(shell find tests -iname "*.cpp"
 graphs:
 	python benchmark/graphs.py
 
-benchmarks: test benchmark-main benchmark-previous benchmark-dev-history benchmark-kissfft benchmark-fftw graphs
+benchmarks: test benchmark-main benchmark-kissfft benchmark-fftw graphs
 
 BENCHMARK_TEST_TIME := 0.05
 
@@ -55,7 +55,7 @@ out/benchmark-fftw: $(shell find benchmark -iname "*.h") $(shell find benchmark 
 		-I benchmark/ benchmark/fftw.cpp \
 		-lfftw3 \
 		-o out/benchmark-fftw
-		
+
 ############## Development ##############
 
 # After an initial "make benchmark", you can continue

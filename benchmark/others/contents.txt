@@ -1,13 +1,5 @@
 kissfft/
 	cloned from https://github.com/mborgerding/kissfft.git
-pffft/
-	cloned from https://bitbucket.org/jpommier/pffft/src/default/ (Mercurial)
-kfr/
-	cloned from https://github.com/kfrlib/kfr.git
-
-	mkdir build && cd build
-	cmake -GXcode -DENABLE_TESTS=ON -DCMAKE_BUILD_TYPE=Release ..
-	cmake --build . --config Release
 
 fftw-3.3.8/
 	downloaded from http://www.fftw.org/fftw-3.3.8.tar.gz
