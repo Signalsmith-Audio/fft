@@ -1,6 +1,8 @@
 # Signalsmith FFT
 
-A small and (reasonable) performant FFT implementation.
+A small and (reasonably) performant C++11 FFT implementation.
+
+Under development, so things might be a little untidy at the moment, but the API's stable and the tests should build/pass.
 
 ```cpp
 #include "signalsmith-fft.h"
